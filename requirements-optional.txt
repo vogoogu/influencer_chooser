@@ -1,0 +1,3 @@
+# Better multilingual topic matching (large download, may not fit Streamlit's free tier).
+# Enable with the environment variable EMBEDDING_BACKEND=sentence-transformers
+sentence-transformers>=3.0

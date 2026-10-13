@@ -1,0 +1,35 @@
+trap_type,entity_type,entity_id,related_id,detail
+fake_follower_spike,account,81,,"followers x2.02 at 2026-06-30, engagement x0.45, fake share 32-45%"
+fake_follower_spike,account,76,,"followers x1.96 at 2026-06-30, engagement x0.45, fake share 32-45%"
+fake_follower_spike,account,110,,"followers x1.61 at 2026-06-30, engagement x0.45, fake share 32-45%"
+fake_follower_spike,account,73,,"followers x2.12 at 2026-06-30, engagement x0.45, fake share 32-45%"
+fake_follower_spike,account,8,,"followers x1.84 at 2026-06-30, engagement x0.45, fake share 32-45%"
+stale_stats,account,44,,last snapshot 2026-03-31
+stale_stats,account,4,,last snapshot 2026-03-31
+stale_stats,account,38,,last snapshot 2026-03-31
+stale_stats,account,112,,last snapshot 2026-03-31
+stale_stats,account,114,,last snapshot 2026-03-31
+expired_rate_card,influencer,32,,all rate cards expired 2026-06-30
+expired_rate_card,influencer,69,,all rate cards expired 2026-06-30
+expired_rate_card,influencer,71,,all rate cards expired 2026-06-30
+expired_rate_card,influencer,72,,all rate cards expired 2026-06-30
+expired_rate_card,influencer,75,,all rate cards expired 2026-06-30
+expired_rate_card,influencer,63,,all rate cards expired 2026-06-30
+consent_expired,influencer,32,,GDPR retention date 2026-08-31 already passed
+consent_expired,influencer,30,,GDPR retention date 2026-08-31 already passed
+consent_expired,influencer,74,,GDPR retention date 2026-08-31 already passed
+competitor_conflict,influencer,21,63,promoted competitor Veggora on 2026-10-04
+competitor_conflict,influencer,31,63,promoted competitor Veggora on 2026-09-13
+exclusivity_block,influencer,26,63,exclusive to a competitor 2026-07-15..2027-02-28
+competitor_conflict,influencer,23,64,promoted competitor Alpenflex on 2026-09-05
+competitor_conflict,influencer,57,64,promoted competitor Velocita Sport on 2026-09-20
+exclusivity_block,influencer,80,64,exclusive to a competitor 2026-07-15..2027-02-28
+competitor_conflict,influencer,45,65,promoted competitor Fiscalo on 2026-09-15
+competitor_conflict,influencer,8,65,promoted competitor Sparfuchs App on 2026-08-28
+exclusivity_block,influencer,78,65,exclusive to a competitor 2026-07-15..2027-02-28
+competitor_conflict,influencer,4,66,promoted competitor Kontoro on 2026-10-03
+competitor_conflict,influencer,45,66,promoted competitor Kontoro on 2026-09-29
+competitor_conflict,influencer,67,67,promoted competitor Gipfelwerk on 2026-09-08
+competitor_conflict,influencer,12,67,promoted competitor Gipfelwerk on 2026-09-10
+competitor_conflict,influencer,73,68,promoted competitor Wegwerk Reisen on 2026-09-26
+competitor_conflict,influencer,63,68,promoted competitor Wegwerk Reisen on 2026-09-26

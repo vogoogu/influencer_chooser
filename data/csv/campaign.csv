@@ -1,0 +1,69 @@
+id,brand_id,name,goal,budget_eur,start_date,end_date,target_country,status
+1,31,Kontoro Summer 2026 Seasonal Drive,awareness,9500.0,2026-08-20,2026-09-28,AT,completed
+2,21,Kreislauf Mode Summer 2026 Launch,sales,6000.0,2026-07-10,2026-08-16,CH,completed
+3,7,Bergbohne Coffee Summer 2026 Push,awareness,16500.0,2026-07-25,2026-08-25,DE,completed
+4,25,Questforge Summer 2026 Seasonal Drive,app_installs,37500.0,2026-07-22,2026-08-16,AT,completed
+5,24,Nodewave Summer 2026 Creator Series,sales,30500.0,2026-07-08,2026-07-29,CH,completed
+6,36,Wohnraum Atelier Summer 2026 Seasonal Drive,sales,17000.0,2026-07-09,2026-08-06,AT,completed
+7,14,ProtiPeak Summer 2026 Creator Series,traffic,17500.0,2026-07-16,2026-08-26,DE,completed
+8,37,Holzart Home Summer 2026 Creator Series,sales,17500.0,2026-08-16,2026-09-24,AT,completed
+9,10,Nordstride Summer 2026 Launch,awareness,11500.0,2026-07-09,2026-07-24,DE,completed
+10,21,Kreislauf Mode Summer 2026 Seasonal Drive,app_installs,12500.0,2026-07-27,2026-08-23,AT,completed
+11,24,Nodewave Summer 2026 Creator Series,traffic,35000.0,2026-07-22,2026-08-27,AT,completed
+12,12,Velocita Sport Summer 2026 Launch,awareness,10000.0,2026-08-18,2026-09-08,AT,completed
+13,13,Muskelkorn Summer 2026 Seasonal Drive,traffic,22000.0,2026-08-06,2026-09-16,DE,completed
+14,18,Reinblatt Cosmetics Summer 2026 Launch,app_installs,7000.0,2026-08-15,2026-09-06,AT,completed
+15,41,Hopfenhain Summer 2026 Seasonal Drive,traffic,8000.0,2026-07-31,2026-08-19,DE,completed
+16,14,ProtiPeak Summer 2026 Seasonal Drive,sales,15500.0,2026-08-06,2026-09-02,AT,completed
+17,38,Kleinstern Summer 2026 Creator Series,sales,16500.0,2026-07-19,2026-08-07,AT,completed
+18,37,Holzart Home Summer 2026 Creator Series,app_installs,10500.0,2026-08-19,2026-09-22,AT,completed
+19,33,Fiscalo Summer 2026 Push,app_installs,12500.0,2026-08-12,2026-09-03,AT,completed
+20,29,Gipfelwerk Summer 2026 Push,app_installs,15000.0,2026-08-12,2026-09-01,AT,completed
+21,28,Citylyst Summer 2025 Seasonal Drive,traffic,25000.0,2025-06-01,2025-07-06,AT,completed
+22,28,Citylyst Winter 2026 Seasonal Drive,awareness,14500.0,2026-01-23,2026-02-19,AT,completed
+23,6,Backstube Nord Summer 2025 Seasonal Drive,traffic,15500.0,2025-07-01,2025-08-09,AT,completed
+24,10,Nordstride Autumn 2025 Launch,awareness,9500.0,2025-11-20,2026-01-01,AT,completed
+25,3,Kornblume Kitchen Spring 2026 Push,traffic,9000.0,2026-05-20,2026-06-13,AT,completed
+26,4,Mehlkind Spring 2026 Push,awareness,13000.0,2026-03-24,2026-04-25,CH,completed
+27,27,Wegwerk Reisen Winter 2026 Seasonal Drive,traffic,13000.0,2026-01-20,2026-02-07,CH,completed
+28,8,Teekontor Alpin Spring 2025 Push,awareness,8000.0,2025-05-24,2025-06-23,AT,completed
+29,13,Muskelkorn Summer 2026 Creator Series,awareness,16500.0,2026-06-23,2026-07-20,DE,completed
+30,36,Wohnraum Atelier Summer 2026 Seasonal Drive,awareness,5500.0,2026-06-28,2026-07-20,AT,completed
+31,36,Wohnraum Atelier Summer 2025 Launch,app_installs,26500.0,2025-06-21,2025-07-14,AT,completed
+32,29,Gipfelwerk Winter 2026 Push,sales,4500.0,2026-01-12,2026-01-26,DE,completed
+33,9,Kaffeeraum Spring 2026 Creator Series,awareness,21500.0,2026-03-01,2026-04-11,AT,completed
+34,31,Kontoro Summer 2026 Creator Series,awareness,14000.0,2026-06-27,2026-07-12,AT,completed
+35,24,Nodewave Autumn 2025 Push,awareness,14000.0,2025-09-23,2025-10-10,DE,completed
+36,21,Kreislauf Mode Spring 2026 Creator Series,awareness,30000.0,2026-05-24,2026-06-30,CH,completed
+37,15,FitFuel Lab Winter 2026 Push,awareness,20000.0,2026-02-19,2026-04-02,AT,completed
+38,15,FitFuel Lab Spring 2026 Launch,traffic,26500.0,2026-03-30,2026-05-07,AT,completed
+39,27,Wegwerk Reisen Spring 2026 Creator Series,awareness,24000.0,2026-03-04,2026-03-29,AT,completed
+40,39,Windelwunder Summer 2025 Creator Series,traffic,11000.0,2025-07-08,2025-08-19,AT,completed
+41,6,Backstube Nord Spring 2026 Creator Series,awareness,16500.0,2026-05-25,2026-06-30,AT,completed
+42,14,ProtiPeak Spring 2026 Launch,traffic,13000.0,2026-04-14,2026-05-15,IT,completed
+43,8,Teekontor Alpin Summer 2026 Seasonal Drive,traffic,8000.0,2026-06-20,2026-07-20,DE,completed
+44,39,Windelwunder Autumn 2025 Creator Series,sales,3000.0,2025-10-04,2025-11-02,AT,completed
+45,38,Kleinstern Autumn 2025 Launch,traffic,11000.0,2025-09-20,2025-11-02,AT,completed
+46,2,Veggora Summer 2025 Push,awareness,16000.0,2025-08-22,2025-09-24,AT,completed
+47,31,Kontoro Winter 2026 Push,app_installs,6000.0,2026-02-22,2026-03-16,DE,completed
+48,9,Kaffeeraum Summer 2025 Launch,sales,5000.0,2025-06-01,2025-06-28,DE,completed
+49,29,Gipfelwerk Winter 2025 Seasonal Drive,sales,7000.0,2025-12-02,2026-01-13,DE,completed
+50,22,Pixelbrook Winter 2026 Seasonal Drive,sales,4500.0,2026-02-26,2026-03-20,AT,completed
+51,26,Pixelhorn Games Spring 2026 Creator Series,app_installs,6500.0,2026-05-09,2026-06-20,IT,completed
+52,22,Pixelbrook Autumn 2025 Creator Series,sales,32500.0,2025-10-26,2025-12-01,IT,completed
+53,14,ProtiPeak Summer 2025 Launch,sales,12000.0,2025-06-21,2025-07-10,AT,completed
+54,29,Gipfelwerk Spring 2025 Seasonal Drive,app_installs,10500.0,2025-05-07,2025-06-21,AT,completed
+55,9,Kaffeeraum Spring 2026 Push,traffic,17500.0,2026-04-07,2026-05-20,DE,completed
+56,7,Bergbohne Coffee Winter 2025 Launch,awareness,10000.0,2025-12-09,2025-12-25,DE,completed
+57,31,Kontoro Autumn 2025 Push,awareness,4500.0,2025-11-20,2025-12-25,AT,completed
+58,10,Nordstride Autumn 2025 Push,traffic,9000.0,2025-10-15,2025-11-20,AT,completed
+59,37,Holzart Home Summer 2025 Launch,traffic,8000.0,2025-07-23,2025-08-24,IT,completed
+60,7,Bergbohne Coffee Summer 2025 Launch,awareness,23500.0,2025-06-08,2025-07-06,AT,completed
+61,11,Alpenflex Autumn 2026 Seasonal Drive,awareness,18000.0,2026-09-21,2026-10-25,AT,running
+62,17,Lumera Skin Autumn 2026 Push,sales,14000.0,2026-09-28,2026-10-29,DE,running
+63,1,Gruenwerk Foods Autumn 2026 Launch,sales,15000.0,2026-10-19,2026-11-19,AT,planned
+64,10,Nordstride Autumn 2026 Seasonal Drive,awareness,25000.0,2026-11-02,2026-11-27,DE,planned
+65,31,Kontoro Autumn 2026 Push,app_installs,20000.0,2026-11-16,2026-12-19,AT,planned
+66,32,Sparfuchs App Winter 2026 Creator Series,traffic,16500.0,2026-12-07,2027-01-10,AT,planned
+67,30,Schneehaus Outdoor Winter 2026 Push,sales,6500.0,2026-12-02,2027-01-15,AT,planned
+68,28,Citylyst Winter 2026 Seasonal Drive,traffic,9000.0,2026-12-07,2027-01-02,AT,planned

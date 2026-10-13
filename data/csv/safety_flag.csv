@@ -1,0 +1,17 @@
+id,influencer_id,flag_type,severity,source,evidence_url,flagged_at,expires_at
+1,47,political_content,2,manual_review,https://example.invalid/evidence/47-political_content,2026-04-09,
+2,47,gambling_promotion,3,manual_review,https://example.invalid/evidence/47-gambling_promotion,2026-03-06,2027-03-06
+3,76,controversy,3,manual_review,https://example.invalid/evidence/76-controversy,2025-10-15,
+4,70,alcohol_promotion,1,news_check,https://example.invalid/evidence/70-alcohol_promotion,2026-01-15,2027-01-15
+5,80,crypto_promotion,3,community_report,https://example.invalid/evidence/80-crypto_promotion,2026-04-06,2027-04-06
+6,78,gambling_promotion,3,manual_review,https://example.invalid/evidence/78-gambling_promotion,2025-10-17,
+7,52,undisclosed_advertising,2,community_report,https://example.invalid/evidence/52-undisclosed_advertising,2026-03-06,2027-03-06
+8,18,political_content,2,news_check,https://example.invalid/evidence/18-political_content,2025-10-28,
+9,63,alcohol_promotion,2,news_check,https://example.invalid/evidence/63-alcohol_promotion,2026-05-22,
+10,56,gambling_promotion,3,manual_review,https://example.invalid/evidence/56-gambling_promotion,2026-08-11,
+11,56,alcohol_promotion,2,manual_review,https://example.invalid/evidence/56-alcohol_promotion,2026-02-05,
+12,40,political_content,2,manual_review,https://example.invalid/evidence/40-political_content,2026-09-02,
+13,51,crypto_promotion,3,news_check,https://example.invalid/evidence/51-crypto_promotion,2026-08-13,
+14,68,profanity,1,community_report,https://example.invalid/evidence/68-profanity,2026-04-22,2027-04-22
+15,58,controversy,3,community_report,https://example.invalid/evidence/58-controversy,2026-03-29,2027-03-29
+16,25,controversy,3,manual_review,https://example.invalid/evidence/25-controversy,2026-04-22,

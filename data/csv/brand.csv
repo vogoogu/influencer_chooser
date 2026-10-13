@@ -1,0 +1,42 @@
+id,name,category,hq_country
+1,Gruenwerk Foods,plant_based_food,DE
+2,Veggora,plant_based_food,AT
+3,Kornblume Kitchen,plant_based_food,DE
+4,Mehlkind,bakery_snacks,DE
+5,Crumbly Joe,bakery_snacks,AT
+6,Backstube Nord,bakery_snacks,CH
+7,Bergbohne Coffee,coffee_beverages,DE
+8,Teekontor Alpin,coffee_beverages,DE
+9,Kaffeeraum,coffee_beverages,AT
+10,Nordstride,sportswear,AT
+11,Alpenflex,sportswear,AT
+12,Velocita Sport,sportswear,CH
+13,Muskelkorn,fitness_nutrition,DE
+14,ProtiPeak,fitness_nutrition,DE
+15,FitFuel Lab,fitness_nutrition,AT
+16,Hautnah Labs,skincare,AT
+17,Lumera Skin,skincare,DE
+18,Reinblatt Cosmetics,skincare,AT
+19,Faden & Form,fashion,DE
+20,Urbanloom,fashion,DE
+21,Kreislauf Mode,fashion,DE
+22,Pixelbrook,tech_gadgets,AT
+23,Zentrix,tech_gadgets,CH
+24,Nodewave,tech_gadgets,DE
+25,Questforge,gaming,DE
+26,Pixelhorn Games,gaming,AT
+27,Wegwerk Reisen,travel,AT
+28,Citylyst,travel,AT
+29,Gipfelwerk,outdoor_gear,AT
+30,Schneehaus Outdoor,outdoor_gear,DE
+31,Kontoro,fintech,DE
+32,Sparfuchs App,fintech,CH
+33,Fiscalo,fintech,AT
+34,Pfotenglueck,pet_food,AT
+35,Napfwerk,pet_food,AT
+36,Wohnraum Atelier,home_interior,AT
+37,Holzart Home,home_interior,AT
+38,Kleinstern,baby_family,AT
+39,Windelwunder,baby_family,AT
+40,Alpenbrenner,alcoholic_beverages,DE
+41,Hopfenhain,alcoholic_beverages,AT

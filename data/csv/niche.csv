@@ -1,0 +1,30 @@
+id,name,parent_id
+1,Food & Drink,
+2,vegan_cooking,1.0
+3,baking,1.0
+4,coffee_tea,1.0
+5,Fitness & Health,
+6,running,5.0
+7,yoga_pilates,5.0
+8,strength_training,5.0
+9,nutrition,5.0
+10,Beauty & Fashion,
+11,skincare,10.0
+12,sustainable_fashion,10.0
+13,streetwear,10.0
+14,Tech & Gaming,
+15,gadgets_tech,14.0
+16,gaming,14.0
+17,Travel & Outdoor,
+18,hiking_alpine,17.0
+19,city_travel,17.0
+20,skiing_snowboard,17.0
+21,Family & Home,
+22,parenting,21.0
+23,interior_design,21.0
+24,diy,21.0
+25,Finance & Career,
+26,personal_finance,25.0
+27,career_tips,25.0
+28,Pets,
+29,dogs_cats,28.0
