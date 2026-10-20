@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 OBJECTIVES = {
-    "qualified_reach": "Qualified reach (reach x audience match)",
+    "qualified_reach": "Qualified reach (reach x audience match x topic fit)",
     "conversions": "Expected conversions",
     "score": "Total fit score",
 }
@@ -30,7 +30,7 @@ class MixSettings:
 def candidate_values(pool: pd.DataFrame, objective: str, risk_aversion: float) -> pd.Series:
     reach = (1 - risk_aversion) * pool.reach_p50 + risk_aversion * pool.reach_p10
     if objective == "qualified_reach":
-        return reach * pool.audience_match
+        return reach * pool.audience_match * pool.topic_fit
     if objective == "conversions":
         return pool.exp_conversions * (reach / pool.reach_p50.clip(lower=1))
     if objective == "score":
@@ -60,7 +60,7 @@ def _greedy(pool: pd.DataFrame, vals: pd.Series, s: MixSettings) -> list[int]:
 
 def solve_mix(pool: pd.DataFrame, s: MixSettings) -> dict:
     """Return {'status', 'method', 'selected' (DataFrame), 'value'}.
-    `pool` needs: influencer_id, price, tier, platform, reach_p10, reach_p50, audience_match, exp_conversions, total."""
+    `pool` needs: influencer_id, price, tier, platform, reach_p10, reach_p50, audience_match, topic_fit, exp_conversions, total."""
     pool = pool.reset_index(drop=True)
     if pool.empty:
         return {"status": "empty pool", "method": "none", "selected": pool, "value": 0.0}
@@ -120,6 +120,6 @@ def mix_summary(mix: pd.DataFrame, objective: str, risk_aversion: float) -> dict
         return {"n": 0, "spend": 0.0, "reach_p50": 0.0, "reach_p10_sum": 0.0, "qualified_reach": 0.0, "conversions": 0.0, "cpm": np.nan}
     return {"n": int(len(mix)), "spend": float(mix.price.sum()), "reach_p50": float(mix.reach_p50.sum()),
             "reach_p10_sum": float(mix.reach_p10.sum()),
-            "qualified_reach": float((mix.reach_p50 * mix.audience_match).sum()),
+            "qualified_reach": float((mix.reach_p50 * mix.audience_match * mix.topic_fit).sum()),
             "conversions": float(mix.exp_conversions.sum()),
             "cpm": float(mix.price.sum() / (mix.reach_p50.sum() / 1000)) if mix.reach_p50.sum() else np.nan}

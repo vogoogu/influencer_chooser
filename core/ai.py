@@ -1,4 +1,4 @@
-"""Claude integration. The AI extracts, researches, explains and challenges. It never computes scores,
+"""LLM integration through OpenRouter. The AI extracts, researches, explains and challenges. It never computes scores,
 rankings or budgets, and it only sees facts that come from the database.
 
 Every function returns an AIResult and has a deterministic fallback, so the app is fully usable without an
@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from dataclasses import dataclass
 from datetime import date
 
@@ -24,19 +25,132 @@ class AIResult:
     error: str | None = None
 
 
-def make_client(api_key: str | None):
+class OpenRouterError(RuntimeError):
+    """Raised for any failed OpenRouter call, with a message that says what to fix."""
+
+
+def _explain_error(status: int, data: dict) -> str:
+    err = data.get("error") if isinstance(data, dict) else None
+    msg = (err.get("message") if isinstance(err, dict) else err) or ""
+    hints = {401: "OpenRouter rejected the API key (401). Check OPENROUTER_API_KEY.",
+             402: "Not enough OpenRouter credits (402). Add credits at openrouter.ai.",
+             403: "OpenRouter refused the request (403): the key or the model is not allowed.",
+             404: "Model not found, or no provider supports tool calling for it (404). Try another model slug.",
+             408: "OpenRouter timed out (408).", 429: "OpenRouter rate limit reached (429). Try again in a moment."}
+    return f"{hints[status]} {msg}".strip() if status in hints else f"OpenRouter error {status}: {msg}".strip()
+
+
+def _content_text(content) -> str:
+    """Message content is a string for most models, a list of parts for some."""
+    if isinstance(content, list):
+        return "".join(p.get("text", "") for p in content if isinstance(p, dict))
+    return content or ""
+
+
+def _json_from_text(text: str):
+    """Pull a JSON object out of free text (code fences, prose around it). Returns a dict or None."""
+    t = (text or "").strip()
+    t = re.sub(r"^```(?:json)?\s*|\s*```$", "", t)
+    for candidate in (t, t[t.find("{"): t.rfind("}") + 1] if "{" in t else ""):
+        try:
+            out = json.loads(candidate)
+            if isinstance(out, dict):
+                return out
+        except (ValueError, TypeError):
+            continue
+    return None
+
+
+class OpenRouterClient:
+    """Minimal OpenRouter client (OpenAI-compatible chat completions) with forced tool calls and optional web search."""
+
+    def __init__(self, api_key: str, model: str, url: str = config.OPENROUTER_URL, timeout: float = 90.0, retries: int = 2,
+                 referer: str | None = None):
+        self.api_key, self.model, self.url, self.timeout, self.retries, self.referer = api_key, model, url, timeout, retries, referer
+
+    def _headers(self) -> dict:
+        h = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json", "X-Title": "Influencer Chooser"}
+        if self.referer:
+            h["HTTP-Referer"] = self.referer
+        return h
+
+    def _post(self, body: dict) -> dict:
+        import requests
+        last: Exception | None = None
+        for attempt in range(self.retries + 1):
+            try:
+                r = requests.post(self.url, headers=self._headers(), json=body, timeout=self.timeout)
+            except requests.RequestException as e:
+                last = OpenRouterError(f"Network error talking to OpenRouter: {e}")
+            else:
+                try:
+                    data = r.json()
+                except ValueError:
+                    data = {}
+                if r.status_code >= 400 or (isinstance(data, dict) and data.get("error")):
+                    last = OpenRouterError(_explain_error(r.status_code, data))
+                    if r.status_code not in (429, 500, 502, 503, 504):
+                        raise last                          # retrying a bad key or unknown model is pointless
+                else:
+                    return data
+            if attempt < self.retries:
+                time.sleep(1.5 * (attempt + 1))
+        raise last or OpenRouterError("OpenRouter request failed")
+
+    @staticmethod
+    def _message(data: dict) -> dict:
+        choices = data.get("choices") or []
+        if not choices:
+            raise OpenRouterError("Empty response from OpenRouter")
+        choice = choices[0]
+        if choice.get("error"):
+            raise OpenRouterError(str(choice["error"].get("message", choice["error"])))
+        return choice.get("message") or {}
+
+    def complete_tool(self, tool: dict, user: str, max_tokens: int = 3000) -> dict:
+        """Force the model to answer through one function and return its arguments as a dict."""
+        body = {"model": self.model, "max_tokens": max_tokens,
+                "messages": [{"role": "system", "content": SYSTEM_RULES}, {"role": "user", "content": user}],
+                "tools": [{"type": "function", "function": {"name": tool["name"], "description": tool["description"],
+                                                            "parameters": tool["input_schema"]}}],
+                "tool_choice": {"type": "function", "function": {"name": tool["name"]}},
+                "provider": {"require_parameters": True}}         # only route to providers that honour tools
+        msg = self._message(self._post(body))
+        for call in msg.get("tool_calls") or []:
+            fn = call.get("function") or {}
+            if fn.get("name") == tool["name"]:
+                args = fn.get("arguments")
+                if isinstance(args, dict):
+                    return args
+                parsed = _json_from_text(args or "")
+                if parsed is not None:
+                    return parsed
+        parsed = _json_from_text(_content_text(msg.get("content")))      # some models answer with JSON text instead
+        if parsed is not None:
+            return parsed
+        raise OpenRouterError("The model returned no usable structured answer. Try a model that supports tool calling.")
+
+    def complete_text(self, user: str, max_tokens: int = 1500, web_search: bool = False) -> str:
+        body = {"model": self.model, "max_tokens": max_tokens,
+                "messages": [{"role": "system", "content": SYSTEM_RULES}, {"role": "user", "content": user}]}
+        if web_search:
+            body["tools"] = [{"type": "openrouter:web_search", "parameters": {"max_results": 3}}]
+        return _content_text(self._message(self._post(body)).get("content")).strip()
+
+
+def make_client(api_key: str | None, model: str | None = None):
+    """OpenRouter client, or None when there is no key (the app then runs in rule-based mode)."""
     if not api_key:
         return None
-    try:
-        import anthropic
-        return anthropic.Anthropic(api_key=api_key, timeout=90.0, max_retries=2)
-    except Exception:
-        return None
+    return OpenRouterClient(api_key.strip(), model or config.DEFAULT_MODEL, referer=config.get_secret("OPENROUTER_REFERER"))
 
 
 # ===================================================================== rule-based fallback
 def _has(text: str, kw: str) -> bool:
-    return re.search(rf"(?<![a-zA-ZäöüÄÖÜ]){re.escape(kw)}", text) is not None
+    """Whole-word match with a simple plural/inflection ending ("runner" matches "runners", "dog" matches "dogs").
+    Short keywords only accept a plain "s", so "ski" does not match "skin"; "strength" does not match "strengthens"."""
+    ending = "(?:s|es|e|en|n)?" if len(kw) >= 5 else "s?"
+    return re.search(rf"(?<![a-zA-ZäöüÄÖÜß]){re.escape(kw)}{ending}(?![a-zA-ZäöüÄÖÜß])", text) is not None
 
 
 def _parse_number(s: str) -> float | None:
@@ -89,7 +203,9 @@ def rule_based_profile(text: str) -> dict:
                         + 2 * sum(1 for kw in CATEGORY_KEYWORDS.get(c, []) if _has(low, kw)))
     category = max(cat_score, key=cat_score.get) if max(cat_score.values()) > 0 else CATEGORIES[0]
     matched = [n for n, v in sorted(niche_score.items(), key=lambda x: -x[1]) if v > 0]
-    relevant = [n for n in CATEGORY_NICHES[category] if n in matched] + [n for n in matched if n not in CATEGORY_NICHES[category]]
+    # niches outside the chosen category need stronger evidence (two different keywords) to be added
+    relevant = ([n for n in CATEGORY_NICHES[category] if n in matched]
+                + [n for n in matched if n not in CATEGORY_NICHES[category] and niche_score[n] >= 2])
     relevant = (relevant or CATEGORY_NICHES[category])[:4]
 
     age_min = age_max = None
@@ -139,12 +255,12 @@ PROFILE_TOOL = {
             "category": {"type": "string", "enum": CATEGORIES, "description": "closest brand category"},
             "summary": {"type": "string", "description": "2-3 sentences about the product and campaign"},
             "goal": {"type": "string", "enum": config.GOALS},
-            "budget_eur": {"type": ["number", "null"], "description": "campaign budget in EUR, null if not stated"},
+            "budget_eur": {"type": "number", "description": "campaign budget in EUR; omit if not stated"},
             "target_countries": {"type": "array", "items": {"type": "string", "enum": config.COUNTRIES}},
             "languages": {"type": "array", "items": {"type": "string"}},
             "target_audience": {"type": "object", "properties": {
-                "female_pct": {"type": ["number", "null"], "description": "target share of women 0-100, null if unspecified"},
-                "age_min": {"type": ["integer", "null"]}, "age_max": {"type": ["integer", "null"]},
+                "female_pct": {"type": "number", "description": "target share of women 0-100; omit if unspecified"},
+                "age_min": {"type": "integer"}, "age_max": {"type": "integer"},
                 "description": {"type": "string"}}, "required": ["description"]},
             "relevant_niches": {"type": "array", "items": {"type": "string", "enum": NICHES}, "description": "1-4 creator niches that fit"},
             "tone": {"type": "array", "items": {"type": "string", "enum": config.TONES}},
@@ -152,7 +268,7 @@ PROFILE_TOOL = {
             "restrictions": {"type": "object", "properties": {
                 "excluded_flag_types": {"type": "array", "items": {"type": "string", "enum": config.FLAG_TYPES}},
                 "notes": {"type": "string"}}, "required": ["excluded_flag_types"]},
-            "timeline": {"type": "object", "properties": {"start": {"type": ["string", "null"]}, "end": {"type": ["string", "null"]}}},
+            "timeline": {"type": "object", "properties": {"start": {"type": "string", "description": "YYYY-MM-DD"}, "end": {"type": "string", "description": "YYYY-MM-DD"}}},
             "preferred_platforms": {"type": "array", "items": {"type": "string", "enum": config.PLATFORMS}},
         },
         "required": ["product_name", "category", "summary", "goal", "target_countries", "target_audience",
@@ -192,13 +308,7 @@ SYSTEM_RULES = (
 
 
 def _tool_call(client, tool: dict, user: str, max_tokens: int = 3000) -> dict:
-    resp = client.messages.create(model=config.MODEL, max_tokens=max_tokens, system=SYSTEM_RULES, tools=[tool],
-                                  tool_choice={"type": "tool", "name": tool["name"]},
-                                  messages=[{"role": "user", "content": user}])
-    for block in resp.content:
-        if getattr(block, "type", "") == "tool_use":
-            return block.input
-    raise RuntimeError("model returned no tool call")
+    return client.complete_tool(tool, user, max_tokens)
 
 
 # ===================================================================== brief analysis
@@ -207,16 +317,13 @@ def research_market(client, brief_text: str) -> AIResult:
     if client is None:
         return AIResult("", "fallback", "no API key")
     try:
-        resp = client.messages.create(
-            model=config.MODEL, max_tokens=1500, system=SYSTEM_RULES,
-            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
-            messages=[{"role": "user", "content": (
-                "Research this product for an influencer campaign in the DACH region. In at most 200 words give: "
-                "main competitors and which kinds of creators they work with, current content trends, and any "
-                "brand-safety topics to watch. Cite what you found briefly.\n\n<brief>\n" + brief_text[:4000] + "\n</brief>")}])
-        text = "".join(getattr(b, "text", "") for b in resp.content if getattr(b, "type", "") == "text").strip()
+        text = client.complete_text(
+            "Research this product for an influencer campaign in the DACH region. In at most 200 words give: "
+            "main competitors and which kinds of creators they work with, current content trends, and any "
+            "brand-safety topics to watch. Cite what you found briefly.\n\n<brief>\n" + brief_text[:4000] + "\n</brief>",
+            max_tokens=1500, web_search=True)
         return AIResult(text, "ai")
-    except Exception as e:                      # network, quota, tool not enabled for the account
+    except Exception as e:                      # network, credits, model without tool support
         return AIResult("", "fallback", f"{type(e).__name__}: {e}")
 
 
@@ -366,9 +473,7 @@ def write_memo(client, profile: dict, mix: pd.DataFrame, summary: dict, checks: 
                 "all numbers must be copied exactly. Max 350 words.\n\n"
                 f"<campaign>{json.dumps({'title': title, **{k: profile.get(k) for k in ['product_name', 'goal', 'summary']}}, default=str)}</campaign>\n"
                 f"<facts>{json.dumps({'mix': facts, 'forecast': summary, 'risk_checks': checks}, default=str)}</facts>")
-        resp = client.messages.create(model=config.MODEL, max_tokens=1500, system=SYSTEM_RULES,
-                                      messages=[{"role": "user", "content": user}])
-        text = "".join(getattr(b, "text", "") for b in resp.content if getattr(b, "type", "") == "text").strip()
+        text = client.complete_text(user, max_tokens=1500)
         return AIResult(text or fallback_text, "ai" if text else "fallback")
     except Exception as e:
         return AIResult(fallback_text, "fallback", f"{type(e).__name__}: {e}")

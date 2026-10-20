@@ -9,7 +9,7 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
-from . import config, db, embeddings, predict
+from . import config, db, embeddings, forest, predict
 from .taxonomy import CATEGORY_NICHES, PARENT_OF
 
 AGE_BUCKETS = [("age_18_24", 18, 24), ("age_25_34", 25, 34), ("age_35_44", 35, 44), ("age_45_plus", 45, 64)]
@@ -34,6 +34,7 @@ class FilterSettings:
     start: date | None = None
     end: date | None = None
     apply_correction: bool = True
+    forecast_model: str = "tier"                # "forest", "tier" or "naive" (naive wins if apply_correction is False)
 
 
 # =========================================================================== loading
@@ -138,6 +139,7 @@ def prepare(as_of: date, settings: FilterSettings, profile: dict, brief_text: st
     """Universe with derived columns (prices, predictions, flags, similarity). No filtering yet."""
     df = load_universe(as_of, path)
     corr = predict.fit_correction(predict.load_history(path))
+    method = "naive" if (not settings.apply_correction or settings.forecast_model == "naive") else settings.forecast_model
 
     # deliverable and price
     fmt = {"instagram": settings.ig_format, "tiktok": "video", "youtube": "integration"}
@@ -154,7 +156,7 @@ def prepare(as_of: date, settings: FilterSettings, profile: dict, brief_text: st
     for t in predict.TIER_NAMES:
         m = (df.tier == t).values
         if m.any():
-            a, b, c, s = predict.predict_reach(raw[m].values, t, corr, conf[m].values, settings.apply_correction)
+            a, b, c, s = predict.predict_reach(raw[m].values, t, corr, conf[m].values, method != "naive")
             p10[m], p50[m], p90[m], sig[m] = a, b, c, s
     df["reach_p10"], df["reach_p50"], df["reach_p90"], df["reach_sigma"] = p10, p50, p90, sig
     df["cpm"] = df.price / (df.reach_p50.clip(lower=1) / 1000)
@@ -204,8 +206,42 @@ def prepare(as_of: date, settings: FilterSettings, profile: dict, brief_text: st
             return 0.3
         return 0.0
     df["niche_match"] = df.apply(niche_match, axis=1)
-    meta = {"embedding_backend": backend, "correction": corr, "as_of": as_of}
+    # default conversion rate per reached person: assumed rate for the goal, scaled by niche match
+    goal = profile.get("goal", "awareness")
+    df["conv_rate"] = config.GOAL_CONV_RATE.get(goal, 0.004) * (0.7 + 0.7 * df.niche_match)
+    fmeta = {"requested": method, "reach": "naive" if method == "naive" else "tier correction", "conv": "assumed rates", "notes": []}
+    if method == "forest":
+        _apply_forest(df, settings, profile, conf, fmeta, path)
+    df["cpm"] = df.price / (df.reach_p50.clip(lower=1) / 1000)
+    meta = {"embedding_backend": backend, "correction": corr, "as_of": as_of, "forecast": fmeta}
     return df, meta
+
+
+def _apply_forest(df: pd.DataFrame, settings: FilterSettings, profile: dict, conf: pd.Series, fmeta: dict, path=None) -> None:
+    """Replace the tier-corrected reach forecast (and the assumed conversion rate) by the random forest's,
+    but only for the parts where the forest beat its baseline in cross-validation."""
+    bundle = forest.get_bundle(path)
+    if bundle is None:
+        fmeta["notes"].append(f"Random forest needs at least {forest.MIN_ROWS} logged results; tier correction used instead.")
+        return
+    fc, _ = forest.forecast(bundle, df, settings.category or profile.get("category"), profile.get("goal", "awareness"), conf, path)
+    r, c = bundle["reach"], bundle["conv"]
+    if r.beats_baseline:
+        raw = df.reach_naive.values
+        df["reach_p50"] = raw * np.exp(fc.rf_mu.values)
+        df["reach_p10"] = raw * np.exp(fc.rf_lo.values)
+        df["reach_p90"] = raw * np.exp(fc.rf_hi.values)
+        df["reach_sigma"] = (fc.rf_hi.values - fc.rf_lo.values) / (2 * predict.Z90)
+        fmeta["reach"] = "random forest"
+    else:
+        fmeta["notes"].append(f"Reach forest did not beat '{r.best_baseline}' in cross-validation ({r.gain_vs_best:+.0%}); tier correction used.")
+    if c.beats_baseline:
+        df["conv_rate"] = fc.rf_conv_rate.values
+        fmeta["conv"] = "random forest"
+    else:
+        fmeta["notes"].append(f"Conversion forest did not beat '{c.best_baseline}' ({c.gain_vs_best:+.0%}); assumed rates used.")
+    fmeta["reach_gain"], fmeta["conv_gain"] = r.gain_vs_best, c.gain_vs_best
+    fmeta["n"] = bundle["n"]
 
 
 # =========================================================================== filters
@@ -362,6 +398,8 @@ def weight_sensitivity(d: pd.DataFrame, weights: dict[str, float], n_top: int = 
 
 
 def expected_conversions(d: pd.DataFrame, goal: str) -> pd.Series:
+    if "conv_rate" in d:
+        return d.reach_p50 * d.conv_rate
     rate = config.GOAL_CONV_RATE.get(goal, 0.004)
     return d.reach_p50 * rate * (0.7 + 0.7 * d.niche_match)
 

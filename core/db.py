@@ -74,7 +74,8 @@ def db_mtime(path: Path | None = None) -> float:
 
 
 def save_run(*, title: str, brand_id: int | None, objective: str, budget_eur: float, weights: dict,
-             profile: dict, brief_text: str, notes: str, items: list[dict], path: Path | None = None) -> int:
+             profile: dict, brief_text: str, notes: str, items: list[dict], model_version: str | None = None,
+             path: Path | None = None) -> int:
     """Store a decision (audit trail). `items` need influencer_id, account_id, rank, total_score,
     criterion_scores (dict), selected (0/1), deliverable, fee_eur, reach_p10/p50/p90, ai_explanation."""
     import json
@@ -84,19 +85,20 @@ def save_run(*, title: str, brand_id: int | None, objective: str, budget_eur: fl
             """INSERT INTO run (created_at, title, brand_id, objective, budget_eur, weights_json, profile_json,
                                 brief_text, notes, model_version) VALUES (?,?,?,?,?,?,?,?,?,?)""",
             (datetime.now().isoformat(timespec="seconds"), title, brand_id, objective, budget_eur,
-             json.dumps(weights), json.dumps(profile, default=str), brief_text[:20000], notes, config.MODEL_VERSION_TAG))
+             json.dumps(weights), json.dumps(profile, default=str), brief_text[:20000], notes, model_version or config.MODEL_VERSION_TAG))
         run_id = cur.lastrowid
         for it in items:
             con.execute(
                 """INSERT INTO run_item (run_id, influencer_id, account_id, rank, total_score, criterion_scores, selected,
-                                         deliverable, fee_eur, reach_p10, reach_p50, reach_p90, ai_explanation)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                                         deliverable, fee_eur, reach_p10, reach_p50, reach_p90, reach_naive, ai_explanation)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (run_id, int(it["influencer_id"]), int(it["account_id"]), int(it.get("rank", 0)), float(it["total_score"]),
                  json.dumps(it["criterion_scores"]), int(it.get("selected", 0)), it.get("deliverable"),
                  None if it.get("fee_eur") is None else float(it["fee_eur"]),
                  None if it.get("reach_p10") is None else int(it["reach_p10"]),
                  None if it.get("reach_p50") is None else int(it["reach_p50"]),
-                 None if it.get("reach_p90") is None else int(it["reach_p90"]), it.get("ai_explanation")))
+                 None if it.get("reach_p90") is None else int(it["reach_p90"]),
+                 None if it.get("reach_naive") is None else int(it["reach_naive"]), it.get("ai_explanation")))
         con.commit()
         return run_id
     finally:
@@ -125,10 +127,11 @@ def convert_run_to_campaign(run_id: int, *, name: str, goal: str, start: date, e
         for it in items:
             con.execute(
                 """INSERT INTO participation (campaign_id, influencer_id, account_id, deliverable, fee_eur,
-                                              reach_p10, reach_p50, reach_p90, model_version)
-                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                                              reach_p10, reach_p50, reach_p90, model_version, reach_naive)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
                 (cid, it["influencer_id"], it["account_id"], it["deliverable"] or "reel", it["fee_eur"] or 0,
-                 it["reach_p10"] or 0, it["reach_p50"] or 0, it["reach_p90"] or 0, config.MODEL_VERSION_TAG))
+                 it["reach_p10"] or 0, it["reach_p50"] or 0, it["reach_p90"] or 0, run["model_version"],
+                 it["reach_naive"] if it["reach_naive"] is not None else it["reach_p50"]))
         con.execute("UPDATE run SET campaign_id = ? WHERE id = ?", (cid, run_id))
         con.commit()
         return cid

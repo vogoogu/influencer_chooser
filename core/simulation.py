@@ -26,7 +26,10 @@ def simulate_mix(mix: pd.DataFrame, goal: str, n_sim: int = 5000, rho: float = 0
     own = rng.standard_normal((n_sim, n))
     z = np.sqrt(rho) * shared + np.sqrt(1 - rho) * own
     reach_i = np.exp(mu + sigma * z) * reach_mult
-    rate = config.GOAL_CONV_RATE.get(goal, 0.004) * (0.7 + 0.7 * mix.niche_match.values) * conv_mult
+    if "conv_rate" in mix:
+        rate = mix.conv_rate.values * conv_mult
+    else:
+        rate = config.GOAL_CONV_RATE.get(goal, 0.004) * (0.7 + 0.7 * mix.niche_match.values) * conv_mult
     conv_i = reach_i * rate * np.exp(rng.normal(0, CONV_NOISE, (n_sim, n)) - 0.5 * CONV_NOISE ** 2)
     reach, conv = reach_i.sum(axis=1), conv_i.sum(axis=1)
     spend = float(mix.price.sum())

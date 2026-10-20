@@ -66,8 +66,9 @@ Conventions:
 * `engagement_rate` = interactions / **followers** in percent, for every platform.
 * `source` and `confidence` on each snapshot: `api` 0.95, `csv_import` 0.80, `manual` 0.70,
   `ai_estimated` 0.40. Use `confidence` to widen uncertainty in the Monte Carlo step.
-* `participation.reach_p10/p50/p90` were predicted **before** the campaign by a deliberately
-  optimistic `naive-v1` model. `result.actual_reach` is what happened.
+* `participation.reach_p10/p50/p90` is the forecast that was shown **before** the campaign (a deliberately
+  optimistic `naive-v1` model in the generated history). `participation.reach_naive` always holds the plain
+  average-views forecast, the clean baseline the forecast models learn from. `result.actual_reach` is what happened.
 * `embedding` and `profile_embedding` are empty. The app computes them from `bio_text` and
   `caption` (for example with sentence-transformers) and stores them as BLOBs.
 * Dates are ISO strings. "Today" in the dataset is **2026-10-09**.

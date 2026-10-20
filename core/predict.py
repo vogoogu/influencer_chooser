@@ -28,8 +28,8 @@ def load_history(path=None) -> pd.DataFrame:
     when the campaign started."""
     sql = """
     SELECT p.id AS participation_id, p.influencer_id, p.account_id, p.deliverable, p.fee_eur,
-           p.reach_p10, p.reach_p50, p.reach_p90, r.actual_reach, r.actual_engagement, r.conversions,
-           r.delivered_on_time, r.client_rating, c.id AS campaign_id, c.start_date, c.goal, b.category,
+           p.reach_p10, p.reach_p50, p.reach_p90, COALESCE(p.reach_naive, p.reach_p50) AS reach_naive, r.actual_reach, r.actual_engagement, r.conversions,
+           r.delivered_on_time, r.client_rating, r.measured_at, c.id AS campaign_id, c.start_date, c.goal, b.category,
            a.platform, i.relationship_score, i.country,
            (SELECT s.followers FROM account_snapshot s WHERE s.account_id = p.account_id
              AND s.captured_at < c.start_date ORDER BY s.captured_at DESC LIMIT 1) AS followers_then,
@@ -51,7 +51,7 @@ def load_history(path=None) -> pd.DataFrame:
     df["er_then"] = df["er_then"].fillna(df["er_then"].median())
     df["fake_then"] = df["fake_then"].fillna(df["fake_then"].median())
     df["tier"] = tier_of(df["followers_then"])
-    df["ratio"] = df["actual_reach"] / df["reach_p50"].clip(lower=1)
+    df["ratio"] = df["actual_reach"] / df["reach_naive"].clip(lower=1)      # always vs the plain average-views forecast
     df["log_ratio"] = np.log(df["ratio"].clip(lower=1e-3))
     df["inside"] = ((df.actual_reach >= df.reach_p10) & (df.actual_reach <= df.reach_p90)).astype(int)
     return df

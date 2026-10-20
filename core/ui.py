@@ -7,7 +7,7 @@ from datetime import date, timedelta
 
 import streamlit as st
 
-from . import ai, config, db
+from . import ai, components as C, config, db, theme
 from .scoring import FilterSettings
 
 DEFAULT_WEIGHT_PRESET = "Balanced"
@@ -35,13 +35,13 @@ def init_state() -> None:
     ss.setdefault("preset", DEFAULT_WEIGHT_PRESET)
     for k, v in {"f_max_share": 0.4, "f_allow_limited": True, "f_excl_conflicts": True, "f_excl_warn": False,
                  "f_max_sev": 2, "f_ig_format": "reel", "f_min_followers": 0, "f_max_followers": 10_000_000,
-                 "f_apply_corr": True, "use_ai": True}.items():
+                 "f_forecast": "forest", "use_ai": True, "ui_model": config.DEFAULT_MODEL}.items():
         ss.setdefault(k, v)
     keep_alive()
 
 
 KEEP_PREFIXES = ("f_", "w_", "p_", "m_", "sim_", "fx_")
-KEEP_KEYS = ("brief_input", "preset", "use_ai", "ui_api_key", "sample_choice")
+KEEP_KEYS = ("brief_input", "preset", "use_ai", "ui_api_key", "ui_model", "sample_choice")
 
 
 def keep_alive() -> None:
@@ -100,7 +100,8 @@ def filter_settings() -> FilterSettings:
         max_severity=int(ss.get("f_max_sev", 2)), min_followers=int(ss.get("f_min_followers", 0)),
         max_followers=int(ss.get("f_max_followers", 10**9)), ig_format=ss.get("f_ig_format", "reel"),
         client_brand_id=ss.get("client_brand_id"), category=(ss.profile or {}).get("category"),
-        start=ss.get("f_start"), end=ss.get("f_end"), apply_correction=bool(ss.get("f_apply_corr", True)))
+        start=ss.get("f_start"), end=ss.get("f_end"), apply_correction=ss.get("f_forecast", "forest") != "naive",
+        forecast_model=ss.get("f_forecast", "forest"))
 
 
 def settings_key(s: FilterSettings) -> str:
@@ -115,48 +116,113 @@ def settings_from_key(key: str) -> FilterSettings:
 
 
 # ----------------------------------------------------------------------------- AI client
+def active_model() -> str:
+    """Model slug: secret or env var OPENROUTER_MODEL, else the sidebar field, else the default."""
+    return (config.get_secret("OPENROUTER_MODEL") or st.session_state.get("ui_model") or config.DEFAULT_MODEL).strip()
+
+
 def ai_client():
-    """Anthropic client from secrets/env or the sidebar field, or None (rule-based mode)."""
+    """OpenRouter client from secrets/env or the sidebar field, or None (rule-based mode)."""
     ss = st.session_state
     if not ss.get("use_ai", True):
         return None
-    key = config.get_secret("ANTHROPIC_API_KEY") or ss.get("ui_api_key") or None
+    key = config.get_secret("OPENROUTER_API_KEY") or ss.get("ui_api_key") or None
     if not key:
         return None
-    if ss.get("_client_for") != key:
-        ss._client = ai.make_client(key)
-        ss._client_for = key
+    sig = (key, active_model())
+    if ss.get("_client_for") != sig:
+        ss._client = ai.make_client(key, sig[1])
+        ss._client_for = sig
     return ss.get("_client")
 
 
 def ai_badge(source: str | None, error: str | None = None) -> None:
+    """Small provenance chip: who wrote this text, the AI model or the rule-based fallback."""
     if source == "ai":
-        st.caption(":material/smart_toy: Written by Claude from the database facts")
+        C.chips([("Written by the AI model from database facts", "primary", "sparkles")])
     elif source == "fallback":
-        msg = " (" + error + ")" if error and error != "no API key" else ""
-        st.caption(f":material/rule: Rule-based text, no AI used{msg}")
+        msg = f" ({error})" if error and error != "no API key" else ""
+        C.chips([(f"Rule-based text, no AI used{msg}", "neutral", "info")])
 
 
-# ----------------------------------------------------------------------------- sidebar
+# ----------------------------------------------------------------------------- chrome
+def page_config(title: str, icon: str) -> None:
+    """set_page_config that is safe under st.navigation (the router already set it) and when run standalone."""
+    try:
+        st.set_page_config(page_title=f"{title} | Influencer Chooser", page_icon=icon, layout="wide", initial_sidebar_state="auto")
+    except Exception:
+        pass
+
+
+def apply_theme() -> None:
+    theme.register_plotly_template()
+    # st.html sanitises a leading <style> away; markdown with unsafe_allow_html keeps it
+    st.markdown(f"<style>{theme.css()}</style>", unsafe_allow_html=True)
+
+
+def workflow_done() -> set[int]:
+    """Which of the five workflow steps have been completed (shown in the stepper)."""
+    ss, done = st.session_state, set()
+    if ss.get("profile"):
+        done.add(1)
+    if ss.get("ranked") is not None and len(ss.ranked):
+        done.add(2)
+    try:
+        runs = db.read("SELECT COUNT(*) AS n, COALESCE(SUM(campaign_id IS NOT NULL), 0) AS c FROM run")
+        if int(runs.n[0]) > 0:
+            done.add(3)
+        if int(runs.c[0]) > 0:
+            done.add(4)
+    except Exception:
+        pass
+    return done
+
+
+def header(title: str, subtitle: str = "", step: int | None = None, eyebrow: str | None = None) -> None:
+    """Page title block, with the workflow stepper on the five workflow pages."""
+    C.page_header(title, subtitle, eyebrow or (f"Step {step} of {len(C.WORKFLOW)}" if step else None))
+    if step:
+        C.stepper(step, workflow_done())
+
+
+def card(key: str | None = None):
+    """A bordered white surface for grouping related content. Keys are deterministic per run (card-1, card-2 ...)
+    so the stylesheet can address them and widget state is never affected."""
+    if key is None:
+        st.session_state["_card_i"] = st.session_state.get("_card_i", 0) + 1
+        key = f"card-{st.session_state['_card_i']}"
+    return st.container(border=True, key=key)
+
+
 def sidebar() -> None:
+    """Theme + the part of the sidebar below the navigation: workspace status, AI settings, data."""
     init_state()
+    st.session_state["_card_i"] = 0                    # restart the card key counter on every run
+    apply_theme()
+    client = ai_client()
     with st.sidebar:
-        st.markdown("### Influencer Chooser")
-        st.caption("Decision support for matching creators to a product brief.")
-        st.markdown("**AI assistant**")
-        has_secret = bool(config.get_secret("ANTHROPIC_API_KEY"))
-        st.checkbox("Use AI (Claude)", key="use_ai", help="Off = rule-based mode, nothing leaves your machine.")
-        if st.session_state.use_ai and not has_secret:
-            st.text_input("Anthropic API key", type="password", key="ui_api_key",
-                          help="Kept in this browser session only. For deployment use Streamlit secrets.")
-        client = ai_client()
+        C.panel_title("Workspace")
         if client:
-            st.success(f"Claude active ({config.MODEL})", icon=":material/check_circle:")
+            C.chips([("AI active via OpenRouter", "success", "check"), (active_model(), "outline")])
         else:
-            st.info("Rule-based mode (no API key)", icon=":material/rule:")
-        st.markdown("**Data**")
-        st.caption(f"Database as of {db.as_of().isoformat()}. Synthetic demo data." if _is_synthetic() else f"Database as of {db.as_of().isoformat()}.")
-        with st.expander("Reset demo database"):
+            C.chips([("Rule-based mode", "neutral", "info")])
+            st.caption("No API key set. The brief is read by keyword rules and text is template-based.")
+        with st.expander("AI assistant", icon=":material/smart_toy:"):
+            has_secret = bool(config.get_secret("OPENROUTER_API_KEY"))
+            st.checkbox("Use AI", key="use_ai", help="Off = rule-based mode, nothing leaves your machine.")
+            if st.session_state.use_ai and not has_secret:
+                st.text_input("OpenRouter API key", type="password", key="ui_api_key",
+                              help="Kept in this browser session only. For deployment add OPENROUTER_API_KEY to Streamlit secrets. "
+                                   "Create a key at openrouter.ai/keys.")
+            elif has_secret:
+                st.caption("OpenRouter API key loaded from secrets.")
+            if st.session_state.use_ai and not config.get_secret("OPENROUTER_MODEL"):
+                st.text_input("Model", key="ui_model",
+                              help="Any OpenRouter model slug that supports tool calling, for example anthropic/claude-sonnet-5.5 "
+                                   "or openai/gpt-5.2. See openrouter.ai/models.")
+        synthetic = _is_synthetic()
+        C.chips([(f"Data as of {db.as_of().isoformat()}", "outline"), *([("Synthetic", "warning")] if synthetic else [])])
+        with st.expander("Reset demo database", icon=":material/restart_alt:"):
             st.caption("Deletes saved decisions and logged results and restores the original dataset.")
             if st.button("Reset now", key="reset_db_btn"):
                 db.reset_db()
@@ -183,10 +249,11 @@ def page_link(path: str, label: str, icon: str | None = None) -> None:
 
 
 def need_profile() -> bool:
-    """Show a hint and return True if no brief has been analysed yet."""
+    """Show an empty state and return True if no brief has been analysed yet."""
     if not st.session_state.get("profile"):
-        st.info("Start with the **Product brief** page: upload or paste a brief and let the tool build the profile.", icon=":material/arrow_back:")
-        page_link("pages/1_Product_Brief.py", label="Go to Product brief", icon=":material/description:")
+        C.empty_state("No brief analysed yet", "Upload or paste a product brief first. The tool turns it into a structured profile "
+                      "that drives the filters, scoring and the campaign mix.", "file")
+        page_link("pages/1_Product_Brief.py", label="Go to the product brief", icon=":material/arrow_forward:")
         return True
     return False
 

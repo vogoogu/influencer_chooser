@@ -7,18 +7,17 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from core import charts, db, predict, ui
+from core import charts, components as C, db, predict, ui
 
-st.set_page_config(page_title="Calibration", page_icon=":material/target:", layout="wide")
+ui.page_config("Calibration", ":material/target:")
 ui.sidebar()
 
-st.title("Calibration")
-st.caption("Step 5. How good were past forecasts, and what really predicts success? "
-           "This is where the tool learns: its forecasts are corrected with what it finds here.")
+ui.header("Calibration", "How good were past forecasts, and what really predicts success? This is where the tool learns: "
+          "its forecasts are corrected with what it finds here.", step=5)
 
 hist = predict.load_history()
 if len(hist) < 10:
-    st.info("At least 10 logged campaign results are needed. Log results on the Decision log page.", icon=":material/info:")
+    C.empty_state("Not enough results yet", "At least 10 logged campaign results are needed. Log results on the Decision log page.", "target")
     st.stop()
 
 cov = predict.coverage_by_tier(hist)
@@ -52,6 +51,9 @@ with t1:
         st.plotly_chart(charts.coverage_bar(cov), width="stretch")
 
 with t2:
+    st.info("The simple per-tier correction below is one of three forecast methods. The random forest goes further and learns from many "
+            "inputs at once. See how it works and how it is tested on the Forecast model page.", icon=":material/forest:")
+    ui.page_link("pages/7_Forecast_Model.py", label="Open the forecast model page", icon=":material/forest:")
     rows = [{"tier": t, "results": corr[t]["n"], "bias multiplier": float(np.exp(corr[t]["mu"])),
              "uncertainty (log sd)": corr[t]["sigma"]} for t in predict.TIER_NAMES]
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",

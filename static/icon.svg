@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" role="img" aria-label="Influencer Chooser">
+  <rect x="2" y="2" width="36" height="36" rx="10" fill="#165B4C"/>
+  <path d="M26.5 14.2a8.6 8.6 0 1 0 0 11.6" fill="none" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round"/>
+  <circle cx="27.4" cy="20" r="2.9" fill="#F2B84B"/>
+</svg>

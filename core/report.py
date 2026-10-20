@@ -59,7 +59,7 @@ def risk_checks(mix: pd.DataFrame, profile: dict, budget: float, sim: dict | Non
 
 
 def memo_markdown(title: str, profile: dict, mix: pd.DataFrame, summary: dict, sim: dict, checks: list[dict],
-                  as_of: date, weights: dict, backend: str) -> str:
+                  as_of: date, weights: dict, backend: str, forecast_note: str = "bias-corrected from past campaign results (tier correction)") -> str:
     L = [f"# Decision memo: {title}", "",
          f"*Prepared {as_of.isoformat()}. Product: {profile.get('product_name', '')}. Goal: {profile.get('goal', '')}. "
          f"Budget: EUR {summary.get('budget', 0):,.0f}.*", "", "## Recommendation", ""]
@@ -80,7 +80,7 @@ def memo_markdown(title: str, profile: dict, mix: pd.DataFrame, summary: dict, s
     L += ["", "## How this was decided", "",
           "Hard filters removed unavailable, conflicted or non-compliant creators. The rest were scored on seven weighted criteria: "
           + ", ".join(f"{config.CRITERIA_LABELS[k].lower()} {w[k]:.0%}" for k in config.CRITERIA) + ". "
-          f"Topic similarity used {backend}. Reach forecasts are bias-corrected from past campaign results; "
+          f"Topic similarity used {backend}. Reach forecasts are {forecast_note}; "
           "the mix was chosen by integer programming under the budget and portfolio constraints. "
           "Numbers come from deterministic code and the agency database; AI was used for reading the brief and wording."]
     return "\n".join(L)

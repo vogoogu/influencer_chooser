@@ -35,6 +35,14 @@ def test_rule_based_profile_on_sample_briefs(name, category, goal, budget, count
     assert set(p["relevant_niches"]) <= set(taxonomy.NICHES)
 
 
+def test_keywords_match_whole_words_only():
+    assert ai._has("a trail runner", "runner") and ai._has("two runners", "runner") and ai._has("vegane kueche", "vegan")
+    assert not ai._has("a serum for sensitive skin", "ski")
+    assert not ai._has("strengthens the skin barrier", "strength")
+    p = ai.rule_based_profile("# Serum\nA vegan serum that strengthens the skin barrier. Skincare for women 25-40 in Austria. Budget: 9000 EUR")
+    assert p["category"] == "skincare" and p["relevant_niches"] == ["skincare"]
+
+
 def test_rule_based_profile_parses_number_formats():
     assert ai.rule_based_profile("Budget: 12.500 EUR")["budget_eur"] == 12500
     assert ai.rule_based_profile("Budget 30k")["budget_eur"] == 30000

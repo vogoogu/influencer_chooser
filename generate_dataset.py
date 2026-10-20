@@ -685,7 +685,7 @@ class Gen:
     def _participation(self, cid, goal, iid, aid, dl, fee, start, end, bid, completed):
         p10, p50, p90, sn = self._predict(aid, dl, start)
         pid = self.add("participation", campaign_id=cid, influencer_id=iid, account_id=aid, deliverable=dl, fee_eur=float(fee),
-                       reach_p10=p10, reach_p50=p50, reach_p90=p90, model_version=MODEL_VERSION)
+                       reach_p10=p10, reach_p50=p50, reach_p90=p90, model_version=MODEL_VERSION, reach_naive=p50)
         if not completed:
             return
         info, v = self.inf[iid], self.acc[aid]

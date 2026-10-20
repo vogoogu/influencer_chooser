@@ -16,9 +16,11 @@ import pytest  # noqa: E402
 
 @pytest.fixture()
 def fresh_db():
-    """A fresh copy of the baseline database for tests that write."""
+    """A fresh copy of the baseline database for tests that write; restored again afterwards so tests stay independent."""
     from core import db
-    return db.reset_db()
+    path = db.reset_db()
+    yield path
+    db.reset_db()
 
 
 @pytest.fixture(scope="session")

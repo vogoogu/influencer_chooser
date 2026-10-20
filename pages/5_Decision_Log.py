@@ -9,14 +9,13 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from core import config, db, ui
+from core import components as C, config, db, ui
 
-st.set_page_config(page_title="Decision log", page_icon=":material/history:", layout="wide")
+ui.page_config("Decision log", ":material/history:")
 ui.sidebar()
 
-st.title("Decision log")
-st.caption("Step 4. Every saved decision is an audit trail. Convert it into a campaign, then log what really happened. "
-           "Those results feed the calibration page and make future forecasts better.")
+ui.header("Decision log", "Every saved decision is an audit trail. Convert it into a campaign, then log what really happened. "
+          "Those results feed the calibration page and make future forecasts better.", step=4)
 
 t_runs, t_results = st.tabs(["Saved decisions", "Log campaign results"])
 
@@ -26,7 +25,8 @@ with t_runs:
                              (SELECT COUNT(*) FROM run_item i WHERE i.run_id = r.id AND i.selected = 1) AS creators
                       FROM run r LEFT JOIN brand b ON b.id = r.brand_id ORDER BY r.id DESC""")
     if runs.empty:
-        st.info("No decisions saved yet. Build a mix on the Campaign mix page and press **Save decision**.", icon=":material/info:")
+        C.empty_state("No decisions saved yet", "Build a mix on the Campaign mix page and press Save decision. Saved decisions keep the brief, the weights and the forecasts.", "history")
+        ui.page_link("pages/3_Campaign_Mix.py", label="Go to the campaign mix", icon=":material/arrow_forward:")
     else:
         st.dataframe(runs, hide_index=True, width="stretch",
                      column_config={"id": "#", "created_at": "Saved", "title": "Title", "brand": "Client brand",
@@ -40,12 +40,12 @@ with t_runs:
                            WHERE i.run_id = ? ORDER BY i.selected DESC, i.rank""", (int(run_id),))
         c1, c2 = st.columns([2, 1])
         with c1:
-            st.markdown("**Chosen mix**")
+            C.panel_title("Chosen mix")
             st.dataframe(items[items.selected == 1].drop(columns=["selected", "criterion_scores", "ai_explanation"]), hide_index=True, width="stretch")
             if run.notes:
                 st.info(f"Notes: {run.notes}")
         with c2:
-            st.markdown("**Weights used**")
+            C.panel_title("Weights used")
             w = json.loads(run.weights_json)
             st.dataframe(pd.DataFrame({"criterion": [config.CRITERIA_LABELS[k] for k in w], "weight": [round(v, 3) for v in w.values()]}),
                          hide_index=True, width="stretch")
@@ -56,7 +56,7 @@ with t_runs:
         with st.expander(f"All {len(items)} scored candidates in this decision"):
             st.dataframe(items.drop(columns=["criterion_scores", "ai_explanation"]), hide_index=True, width="stretch")
 
-        st.markdown("**Convert into a campaign**")
+        C.section("Convert into a campaign", "Creates a planned campaign with the chosen creators and their forecasts, ready for results.")
         if run.campaign_id:
             st.success(f"Already converted into campaign #{int(run.campaign_id)}.", icon=":material/check_circle:")
         elif run.brand_id is None or pd.isna(run.brand_id):
@@ -94,7 +94,7 @@ with t_results:
                          JOIN account a ON a.id = p.account_id LEFT JOIN result r ON r.participation_id = p.id
                          WHERE r.id IS NULL AND c.status IN ('planned', 'running') ORDER BY c.start_date""")
     if pending.empty:
-        st.info("No campaigns are waiting for results. Convert a saved decision into a campaign first.", icon=":material/info:")
+        C.empty_state("No campaigns waiting for results", "Convert a saved decision into a campaign first. Its creators then appear here so you can log what really happened.", "target")
     else:
         camps = pending.drop_duplicates("campaign_id")
         cid = st.selectbox("Campaign", camps.campaign_id.tolist(),
@@ -106,7 +106,7 @@ with t_results:
             inputs = []
             for i, r in sub.iterrows():
                 st.markdown(f"**{r.creator}** on {r.platform}, {r.deliverable}. Forecast reach {int(r.reach_p10):,} to {int(r.reach_p90):,} (median {int(r.reach_p50):,}).")
-                a, b, c, d, e = st.columns(5)
+                a, b, c, d, e = st.columns([1.2, 1.2, 1.2, 0.8, 1.3], vertical_alignment="bottom")
                 reach = a.number_input("Actual reach", 0, step=1000, key=f"res_reach_{r.participation_id}")
                 eng = b.number_input("Engagements", 0, step=100, key=f"res_eng_{r.participation_id}")
                 conv = c.number_input(f"Conversions ({r.goal.replace('_', ' ')})", 0, step=10, key=f"res_conv_{r.participation_id}")

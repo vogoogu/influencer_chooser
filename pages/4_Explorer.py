@@ -8,39 +8,45 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from core import charts, db, ui
+from core import charts, components as C, db, ui
 
-st.set_page_config(page_title="Explorer", page_icon=":material/search:", layout="wide")
+ui.page_config("Explorer", ":material/search:")
 ui.sidebar()
 
-st.title("Influencer explorer")
-st.caption("Browse the evidence behind the scores: trends over time, audience, rates, flags and campaign history.")
+ui.header("Influencer explorer", "Browse the evidence behind the scores: trends over time, audience, rates, flags and campaign history.", eyebrow="Insights")
 
 inf = db.read("SELECT id, display_name, country, city, status FROM influencer ORDER BY display_name")
-choice = st.selectbox("Creator", inf.id.tolist(), format_func=lambda i: f"{inf.set_index('id').display_name[i]}  ({inf.set_index('id').country[i]})")
+pick, _ = st.columns([2, 3])
+choice = pick.selectbox("Creator", inf.id.tolist(), format_func=lambda i: f"{inf.set_index('id').display_name[i]}  ({inf.set_index('id').country[i]})")
 row = db.read("SELECT * FROM influencer WHERE id = ?", (int(choice),)).iloc[0]
 accounts = db.read("SELECT * FROM account WHERE influencer_id = ?", (int(choice),))
 niches = db.read("""SELECT n.name, inn.is_primary FROM influencer_niche inn JOIN niche n ON n.id = inn.niche_id
                     WHERE inn.influencer_id = ?""", (int(choice),))
 as_of = db.as_of().isoformat()
 
+_status_tone = {"active": "success", "paused": "warning", "offboarded": "danger"}
+_avail_tone = {"open": "success", "limited": "warning", "unavailable": "danger"}
+_flags_n = int(db.read("SELECT COUNT(*) n FROM safety_flag WHERE influencer_id = ?", (int(choice),)).n[0])
+C.profile_header(row.display_name, f"{row.city}, {row.country}  |  Languages: {row.languages}  |  Tone: {row.tone}",
+                 C.chips_html([(row.status, _status_tone.get(row.status, "neutral")), (f"availability: {row.availability}", _avail_tone.get(row.availability, "neutral")),
+                               *[(p, "outline") for p in accounts.platform], *([(f"{_flags_n} safety flag{'s' if _flags_n != 1 else ''}", "danger")] if _flags_n else [])]))
+_n_camp = int(db.read("SELECT COUNT(*) n FROM participation WHERE influencer_id = ?", (int(choice),)).n[0])
 h1, h2, h3, h4 = st.columns(4)
-h1.metric("Status", row.status)
-h2.metric("Availability", row.availability)
-h3.metric("Relationship score", f"{row.relationship_score} / 5")
+h1.metric("Relationship score", f"{row.relationship_score} / 5")
+h2.metric("Past campaigns", _n_camp)
+h3.metric("Active safety flags", _flags_n)
 h4.metric("GDPR consent until", row.consent_until, delta="expired" if row.consent_until < as_of else None, delta_color="inverse")
 
 t_prof, t_trend, t_aud, t_rate, t_hist, t_content = st.tabs(["Profile", "Trends", "Audience", "Rates and flags", "Campaign history", "Content"])
 
 with t_prof:
-    st.markdown(f"**{row.display_name}**, {row.city}, {row.country}. Languages: {row.languages}. Tone: {row.tone}.")
     st.write(row.bio_text)
     prim = ", ".join(n.replace("_", " ") for n, p in zip(niches.name, niches.is_primary) if p)
     sec = ", ".join(n.replace("_", " ") for n, p in zip(niches.name, niches.is_primary) if not p)
     st.markdown(f"Primary niche: **{prim}**" + (f". Also: {sec}." if sec else "."))
     if row.agency_notes:
         st.info(f"Agency notes: {row.agency_notes}", icon=":material/sticky_note_2:")
-    st.dataframe(accounts[["platform", "handle", "url", "verified"]], hide_index=True, width="stretch",
+    st.dataframe(accounts.assign(verified=accounts.verified.map({1: "Yes", 0: "No"}))[["platform", "handle", "url", "verified"]], hide_index=True, width="stretch",
                  column_config={"url": st.column_config.LinkColumn("Profile link")})
 
 with t_trend:

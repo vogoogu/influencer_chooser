@@ -7,7 +7,7 @@ from streamlit.testing.v1 import AppTest
 from core import db, predict
 
 ROOT = Path(__file__).resolve().parents[1]
-PAGES = ["1_Product_Brief", "2_Shortlist", "3_Campaign_Mix", "4_Explorer", "5_Decision_Log", "6_Calibration"]
+PAGES = ["1_Product_Brief", "2_Shortlist", "3_Campaign_Mix", "4_Explorer", "5_Decision_Log", "6_Calibration", "7_Forecast_Model"]
 STATE_KEYS = ["brief_text", "profile", "profile_source", "profile_version", "client_brand_id", "research_text"]
 
 
@@ -104,3 +104,110 @@ def test_shortlist_with_impossible_filters_shows_message(fresh_db):
     s.run()
     assert_clean(s)
     assert any("No creators pass" in w.value for w in s.warning)
+
+
+def test_forecast_page_explains_forest_and_a_shortlisted_creator(fresh_db):
+    from core import ai
+    prof = ai.rule_based_profile(open(ROOT / "data" / "test_briefs" / "brief_nordstride.md", encoding="utf-8").read())
+    s = page("2_Shortlist")
+    s.session_state["profile"], s.session_state["brief_text"] = prof, "brief"
+    s.session_state["profile_version"], s.session_state["client_brand_id"] = 1, None
+    s.run()
+    assert_clean(s)
+    assert any("random forest" in c.value.lower() for c in s.caption)                    # default method is the forest
+    f = page("7_Forecast_Model")
+    for k in ["profile", "brief_text", "profile_version", "client_brand_id", "ranked"]:
+        f.session_state[k] = s.session_state[k]
+    f.run()
+    assert_clean(f)
+    assert {"Past results used for training", "Naive forecast", "Tier correction", "Random forest", "Forecast reach"} <= {m.label for m in f.metric}
+    assert len(f.tabs) == 4 and any("forest wins" in str(m.delta) for m in f.metric)
+
+
+def test_shortlist_forecast_selector_switches_method(fresh_db):
+    from core import ai
+    prof = ai.rule_based_profile("# T\nBudget: 20000 EUR. Running shoe for runners in Austria.")
+    seen = {}
+    for method in ("naive", "tier", "forest"):
+        s = page("2_Shortlist")
+        s.session_state["profile"], s.session_state["brief_text"] = prof, "x"
+        s.session_state["profile_version"], s.session_state["client_brand_id"] = 1, None
+        s.session_state["f_forecast"] = method
+        s.run()
+        assert_clean(s)
+        seen[method] = s.session_state["score_meta"]["forecast"]["reach"]
+    assert seen == {"naive": "naive", "tier": "tier correction", "forest": "random forest"}
+
+
+# ------------------------------------------------------------------ OpenRouter wiring through the real pages
+def _fake_openrouter(monkeypatch):
+    import json as _json
+    import requests
+    calls = []
+    profile = {"product_name": "Fake Shoe", "category": "sportswear", "summary": "AI summary.", "goal": "sales", "target_countries": ["AT"],
+               "target_audience": {"description": "runners", "age_min": 25, "age_max": 40}, "relevant_niches": ["running"],
+               "tone": ["casual"], "restrictions": {"excluded_flag_types": []}}
+
+    class R:
+        status_code = 200
+
+        def json(self):
+            return {"choices": [{"message": {"role": "assistant", "content": None, "tool_calls": [
+                {"id": "1", "type": "function", "function": {"name": "submit_profile", "arguments": _json.dumps(profile)}}]}}]}
+
+    def post(url, headers=None, json=None, timeout=None):
+        calls.append({"url": url, "headers": headers, "json": json})
+        return R()
+    monkeypatch.setattr(requests, "post", post)
+    return calls
+
+
+def _analyze_sample(at):
+    at.run()
+    at.selectbox(key="sample_choice").select("brief_nordstride.md").run()
+    click(at, "Load sample brief")
+    click(at, "Analyze brief")
+    return at
+
+
+def test_key_in_streamlit_secrets_is_used_for_openrouter(fresh_db, monkeypatch):
+    calls = _fake_openrouter(monkeypatch)
+    at = page("1_Product_Brief")
+    at.secrets["OPENROUTER_API_KEY"] = "sk-or-from-secrets"
+    at.secrets["OPENROUTER_MODEL"] = "openai/gpt-5.2"
+    _analyze_sample(at)
+    assert_clean(at)
+    assert at.session_state["profile_source"] == "ai" and at.session_state["profile"]["product_name"] == "Fake Shoe"
+    assert calls[0]["url"] == "https://openrouter.ai/api/v1/chat/completions"
+    assert calls[0]["headers"]["Authorization"] == "Bearer sk-or-from-secrets"
+    assert calls[0]["json"]["model"] == "openai/gpt-5.2"
+    assert calls[0]["json"]["tool_choice"]["function"]["name"] == "submit_profile"
+
+
+def test_sidebar_key_and_model_work_without_secrets(fresh_db, monkeypatch):
+    calls = _fake_openrouter(monkeypatch)
+    at = page("1_Product_Brief")
+    at.session_state["ui_api_key"] = "sk-or-from-sidebar"
+    at.session_state["ui_model"] = "anthropic/claude-sonnet-5.5"
+    _analyze_sample(at)
+    assert_clean(at)
+    assert at.session_state["profile_source"] == "ai"
+    assert calls[0]["headers"]["Authorization"] == "Bearer sk-or-from-sidebar" and calls[0]["json"]["model"] == "anthropic/claude-sonnet-5.5"
+
+
+def test_bad_key_falls_back_to_rules_and_says_why(fresh_db, monkeypatch):
+    import requests
+
+    class R:
+        status_code = 401
+
+        def json(self):
+            return {"error": {"message": "No auth credentials found", "code": 401}}
+    monkeypatch.setattr(requests, "post", lambda *a, **k: R())
+    at = page("1_Product_Brief")
+    at.session_state["ui_api_key"] = "sk-or-bad"
+    _analyze_sample(at)
+    assert_clean(at)
+    assert at.session_state["profile_source"] == "fallback" and "OPENROUTER_API_KEY" in at.session_state["profile_error"]
+    assert at.session_state["profile"]["category"] == "sportswear"          # rule-based result is still usable
+    assert any("AI analysis failed" in w.value for w in at.warning)

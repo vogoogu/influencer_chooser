@@ -166,10 +166,11 @@ CREATE TABLE participation (
     account_id      INTEGER NOT NULL REFERENCES account(id),
     deliverable     TEXT NOT NULL,
     fee_eur         REAL NOT NULL,
-    reach_p10       INTEGER NOT NULL,                        -- prediction made before the campaign
+    reach_p10       INTEGER NOT NULL,                        -- forecast that was shown before the campaign
     reach_p50       INTEGER NOT NULL,
     reach_p90       INTEGER NOT NULL,
-    model_version   TEXT NOT NULL
+    model_version   TEXT NOT NULL,
+    reach_naive     INTEGER                                  -- plain average-views forecast, the clean baseline for learning
 );
 
 CREATE TABLE result (
@@ -215,6 +216,7 @@ CREATE TABLE run_item (
     reach_p10           INTEGER,
     reach_p50           INTEGER,
     reach_p90           INTEGER,
+    reach_naive         INTEGER,
     ai_explanation      TEXT
 );
 

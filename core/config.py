@@ -10,7 +10,11 @@ DB_BASELINE = ROOT / "data" / "influencer_db.sqlite"          # committed, read-
 DB_WORKING = Path(os.getenv("INFLUENCER_DB", ROOT / "data" / "working.sqlite"))  # app writes here
 BRIEF_DIR = ROOT / "data" / "test_briefs"
 
-MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
+# AI goes through OpenRouter (OpenAI-compatible API). The key is OPENROUTER_API_KEY, the model any OpenRouter slug that
+# supports tool calling, for example "anthropic/claude-sonnet-5.5" or "openai/gpt-5.2".
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+DEFAULT_MODEL = "anthropic/claude-sonnet-5.5"
+MODEL = os.getenv("OPENROUTER_MODEL", DEFAULT_MODEL)
 MODEL_VERSION_TAG = "scoring-v1"        # stored with every saved decision
 EMBEDDING_BACKEND = os.getenv("EMBEDDING_BACKEND", "tfidf")   # "tfidf" or "sentence-transformers"
 ST_MODEL = os.getenv("ST_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
@@ -55,6 +59,8 @@ DELIVERABLE_REACH_MULT = {"feed_post": 0.7, "story_set": 0.45, "reel": 1.0, "vid
 # conversions per reached person by campaign goal (clicks, sales or installs): editable assumptions
 GOAL_CONV_RATE = {"awareness": 0.0005, "traffic": 0.012, "sales": 0.0035, "app_installs": 0.004}
 GOALS = list(GOAL_CONV_RATE)
+
+FORECAST_METHODS = {"forest": "Random forest (learned from results)", "tier": "Tier correction (simple)", "naive": "Naive (average views)"}
 
 STALE_DAYS = 90
 SPIKE_GROWTH = 0.50          # month-over-month follower growth that looks suspicious
