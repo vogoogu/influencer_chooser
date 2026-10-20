@@ -241,3 +241,22 @@ def effects_bar(effects: pd.DataFrame, n: int = 8) -> go.Figure:
     fig.update_layout(xaxis=dict(tickformat="+.0%", title="Effect on the forecast versus a typical creator's value"), height=max(280, 30 * len(d) + 80),
                       margin=dict(l=10, r=10, t=10, b=10))
     return fig
+
+
+# ---- every chart gets an explicit white canvas: figure-level layout always beats frontend or template defaults, so charts
+# look identical inside the white cards regardless of Streamlit's plotly handling.
+def _white_canvas(fn):
+    import functools
+
+    @functools.wraps(fn)
+    def inner(*args, **kwargs):
+        fig = fn(*args, **kwargs)
+        fig.update_layout(paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF")
+        return fig
+    return inner
+
+
+for _name in ["contributions_bar", "radar", "stability_bar", "sensitivity_bar", "reach_hist", "conv_hist", "tornado_chart",
+              "calibration_scatter", "bias_bar", "coverage_bar", "driver_bar", "trend_lines", "tree_figure", "votes_hist",
+              "importance_bar", "oof_scatter", "metrics_bar", "pdp_line", "effects_bar"]:
+    globals()[_name] = _white_canvas(globals()[_name])

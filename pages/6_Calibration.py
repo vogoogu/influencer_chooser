@@ -7,10 +7,10 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from core import charts, components as C, db, predict, ui
+from core import charts, components as C, db, predict, tables, ui
 
 ui.page_config("Calibration", ":material/target:")
-ui.sidebar()
+ui.chrome()
 
 ui.header("Calibration", "How good were past forecasts, and what really predicts success? This is where the tool learns: "
           "its forecasts are corrected with what it finds here.", step=5)
@@ -42,13 +42,13 @@ with t1:
     a, b = st.columns(2)
     with a:
         st.markdown("**Predicted vs actual reach**")
-        st.plotly_chart(charts.calibration_scatter(hist), width="stretch")
+        st.plotly_chart(charts.calibration_scatter(hist), theme=None, width="stretch")
         st.caption("Points below the dashed line were over-predicted.")
     with b:
         st.markdown("**Average bias by audience size**")
-        st.plotly_chart(charts.bias_bar(cov), width="stretch")
+        st.plotly_chart(charts.bias_bar(cov), theme=None, width="stretch")
         st.markdown("**Interval coverage by audience size**")
-        st.plotly_chart(charts.coverage_bar(cov), width="stretch")
+        st.plotly_chart(charts.coverage_bar(cov), theme=None, width="stretch")
 
 with t2:
     st.info("The simple per-tier correction below is one of three forecast methods. The random forest goes further and learns from many "
@@ -56,9 +56,7 @@ with t2:
     ui.page_link("pages/7_Forecast_Model.py", label="Open the forecast model page", icon=":material/forest:")
     rows = [{"tier": t, "results": corr[t]["n"], "bias multiplier": float(np.exp(corr[t]["mu"])),
              "uncertainty (log sd)": corr[t]["sigma"]} for t in predict.TIER_NAMES]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch",
-                 column_config={"bias multiplier": st.column_config.NumberColumn(format="%.2f"),
-                                "uncertainty (log sd)": st.column_config.NumberColumn(format="%.2f")})
+    tables.show(pd.DataFrame(rows), labels={"uncertainty (log sd)": "Uncertainty (log sd)"})
     st.markdown(
         "A multiplier of 0.85 means: multiply the naive forecast by 0.85. Tiers with few results are pulled towards the overall "
         "average (shrinkage) so that two unlucky campaigns do not distort a tier. Example: a macro creator with a naive forecast of "
@@ -68,11 +66,7 @@ with t2:
                      FROM v_influencer_reliability v JOIN influencer inf ON inf.id = v.influencer_id
                      WHERE v.n_campaigns >= 3 ORDER BY v.avg_actual_vs_predicted""")
     st.markdown("**Creators who most often under- or over-deliver** (at least 3 campaigns)")
-    st.dataframe(rel, hide_index=True, width="stretch",
-                 column_config={"on_time_rate": st.column_config.NumberColumn("On time", format="percent"),
-                                "avg_client_rating": st.column_config.NumberColumn("Avg rating", format="%.1f"),
-                                "avg_actual_vs_predicted": st.column_config.NumberColumn("Actual / predicted", format="%.2f"),
-                                "n_campaigns": "Campaigns"})
+    tables.show(rel, formats={"avg_client_rating": "%.1f"})
 
 with t3:
     outcome = st.radio("Outcome to explain", ["Reach vs prediction", "Conversion rate (conversions per 1,000 reach)"], horizontal=True)
@@ -81,7 +75,7 @@ with t3:
     if drv.empty:
         st.info("Not enough data for a driver analysis (30 results needed).")
     else:
-        st.plotly_chart(charts.driver_bar(drv), width="stretch")
+        st.plotly_chart(charts.driver_bar(drv), theme=None, width="stretch")
         sig = drv[(drv.lo > 0) | (drv.hi < 0)]
         if len(sig):
             names = {"niche_fit": "niche fit", "engagement_vs_peers": "engagement vs peers", "fake_followers_pct": "fake follower share",

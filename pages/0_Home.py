@@ -5,10 +5,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import streamlit as st
 
-from core import components as C, config, db, scoring, ui
+from core import components as C, config, db, scoring, tables, ui
 
 ui.page_config("Overview", ":material/home:")
-ui.sidebar()
+ui.chrome()
 ss = st.session_state
 
 ui.header("Choose the right creators, backed by evidence",
@@ -91,10 +91,8 @@ C.section("Recent decisions", "Every saved decision keeps its brief, weights and
 if runs.empty:
     C.empty_state("No decisions saved yet", "Build a campaign mix and press Save decision. It will appear here.", "history")
 else:
-    st.dataframe(runs.head(6).assign(status=lambda d: d.campaign_id.map(lambda x: "Converted to campaign" if x == x and x else "Draft")).drop(columns=["campaign_id"]),
-                 hide_index=True, width="stretch",
-                 column_config={"id": st.column_config.NumberColumn("#", width="small"), "created_at": "Saved", "title": "Decision", "brand": "Client brand",
-                                "budget_eur": st.column_config.NumberColumn("Budget", format="euro"), "status": "Status"})
+    tables.show(runs.head(6).assign(status=lambda d: d.campaign_id.map(lambda x: "Converted to campaign" if x == x and x else "Draft")).drop(columns=["campaign_id"]),
+                labels={"brand": "Client brand"}, order=["id", "created_at", "title", "brand", "budget_eur", "status"])
     ui.page_link("pages/5_Decision_Log.py", label="Open the decision log", icon=":material/arrow_forward:")
 
 with st.expander("About this app and its limits"):
@@ -104,5 +102,5 @@ with st.expander("About this app and its limits"):
 - **AI is optional.** Without an API key the brief is analysed by keyword rules and explanations are template-based.
 - **Forecasts are estimates.** Reach is predicted from average views, corrected by what past campaigns showed (tier correction or a random forest), and shown as ranges.
 - **Topic fit** uses TF-IDF text similarity by default. A multilingual sentence-transformer model can be enabled (see README).
-- **Write access.** Saved decisions and results go to a working copy of the database. Use *Reset demo database* in the sidebar to start over.
+- **Write access.** Saved decisions and results go to a working copy of the database. Use *Reset demo database* in the header Menu to start over.
 """)

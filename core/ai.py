@@ -28,6 +28,10 @@ class AIResult:
 class OpenRouterError(RuntimeError):
     """Raised for any failed OpenRouter call, with a message that says what to fix."""
 
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
+
 
 def _explain_error(status: int, data: dict) -> str:
     err = data.get("error") if isinstance(data, dict) else None
@@ -35,7 +39,7 @@ def _explain_error(status: int, data: dict) -> str:
     hints = {401: "OpenRouter rejected the API key (401). Check OPENROUTER_API_KEY.",
              402: "Not enough OpenRouter credits (402). Add credits at openrouter.ai.",
              403: "OpenRouter refused the request (403): the key or the model is not allowed.",
-             404: "Model not found, or no provider supports tool calling for it (404). Try another model slug.",
+             404: "OpenRouter found no matching model or provider (404). Check the model slug, and that the model supports tool calling.",
              408: "OpenRouter timed out (408).", 429: "OpenRouter rate limit reached (429). Try again in a moment."}
     return f"{hints[status]} {msg}".strip() if status in hints else f"OpenRouter error {status}: {msg}".strip()
 
@@ -67,6 +71,7 @@ class OpenRouterClient:
     def __init__(self, api_key: str, model: str, url: str = config.OPENROUTER_URL, timeout: float = 90.0, retries: int = 2,
                  referer: str | None = None):
         self.api_key, self.model, self.url, self.timeout, self.retries, self.referer = api_key, model, url, timeout, retries, referer
+        self.tool_mode: str | None = None              # remembered after the first successful structured call
 
     def _headers(self) -> dict:
         h = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json", "X-Title": "Influencer Chooser"}
@@ -88,7 +93,7 @@ class OpenRouterClient:
                 except ValueError:
                     data = {}
                 if r.status_code >= 400 or (isinstance(data, dict) and data.get("error")):
-                    last = OpenRouterError(_explain_error(r.status_code, data))
+                    last = OpenRouterError(_explain_error(r.status_code, data), r.status_code)
                     if r.status_code not in (429, 500, 502, 503, 504):
                         raise last                          # retrying a bad key or unknown model is pointless
                 else:
@@ -107,15 +112,29 @@ class OpenRouterClient:
             raise OpenRouterError(str(choice["error"].get("message", choice["error"])))
         return choice.get("message") or {}
 
-    def complete_tool(self, tool: dict, user: str, max_tokens: int = 3000) -> dict:
-        """Force the model to answer through one function and return its arguments as a dict."""
-        body = {"model": self.model, "max_tokens": max_tokens,
-                "messages": [{"role": "system", "content": SYSTEM_RULES}, {"role": "user", "content": user}],
+    # Ways to get a structured answer, strictest first. Some models (for example Claude with extended thinking) have no
+    # provider that accepts a forced function choice, which OpenRouter reports as 404 "No endpoints found that support the
+    # provided 'tool_choice' value". The client then steps down and remembers what worked for this model.
+    TOOL_MODES = ("forced", "required", "auto", "json")
+    _LADDER_STATUS = (None, 400, 404, 422)
+
+    def _tool_body(self, tool: dict, user: str, max_tokens: int, mode: str) -> dict:
+        system = {"role": "system", "content": SYSTEM_RULES}
+        if mode == "json":                               # no tools at all: ask for JSON and validate it ourselves
+            ask = (user + "\n\nReturn ONLY one JSON object, no prose and no code fences, that matches this JSON schema:\n"
+                   + json.dumps(tool["input_schema"]))
+            return {"model": self.model, "max_tokens": max_tokens, "messages": [system, {"role": "user", "content": ask}]}
+        if mode == "auto":
+            user = user + f"\n\nAnswer by calling the function {tool['name']} with all required fields."
+        choice = {"forced": {"type": "function", "function": {"name": tool["name"]}}, "required": "required", "auto": "auto"}[mode]
+        return {"model": self.model, "max_tokens": max_tokens, "messages": [system, {"role": "user", "content": user}],
                 "tools": [{"type": "function", "function": {"name": tool["name"], "description": tool["description"],
                                                             "parameters": tool["input_schema"]}}],
-                "tool_choice": {"type": "function", "function": {"name": tool["name"]}},
-                "provider": {"require_parameters": True}}         # only route to providers that honour tools
-        msg = self._message(self._post(body))
+                "tool_choice": choice,
+                "provider": {"require_parameters": mode != "auto"}}   # forced/required: only providers that honour tools
+
+    def _attempt(self, tool: dict, user: str, max_tokens: int, mode: str) -> dict | None:
+        msg = self._message(self._post(self._tool_body(tool, user, max_tokens, mode)))
         for call in msg.get("tool_calls") or []:
             fn = call.get("function") or {}
             if fn.get("name") == tool["name"]:
@@ -125,10 +144,28 @@ class OpenRouterClient:
                 parsed = _json_from_text(args or "")
                 if parsed is not None:
                     return parsed
-        parsed = _json_from_text(_content_text(msg.get("content")))      # some models answer with JSON text instead
-        if parsed is not None:
-            return parsed
-        raise OpenRouterError("The model returned no usable structured answer. Try a model that supports tool calling.")
+        return _json_from_text(_content_text(msg.get("content")))          # models that answer with JSON text instead
+
+    def complete_tool(self, tool: dict, user: str, max_tokens: int = 3000) -> dict:
+        """Structured answer as a dict, trying forced function, required, auto, then plain JSON."""
+        order = ([self.tool_mode] + [m for m in self.TOOL_MODES if m != self.tool_mode]) if self.tool_mode else list(self.TOOL_MODES)
+        last: OpenRouterError | None = None
+        for mode in order:
+            try:
+                out = self._attempt(tool, user, max_tokens, mode)
+            except OpenRouterError as e:
+                if e.status not in self._LADDER_STATUS:
+                    raise                                  # bad key, no credits, rate limit, outage: another mode will not help
+                last = e
+                continue
+            if out is not None:
+                self.tool_mode = mode
+                return out
+            last = OpenRouterError("The model returned no usable structured answer.")
+        detail = f" Tried forced, required and auto function calls and plain JSON. {last}" if last else ""
+        raise OpenRouterError(f"No working way to get a structured answer from {self.model}.{detail} "
+                              "Pick a model with tool-calling support (openrouter.ai/models?supported_parameters=tools).",
+                              getattr(last, "status", None))
 
     def complete_text(self, user: str, max_tokens: int = 1500, web_search: bool = False) -> str:
         body = {"model": self.model, "max_tokens": max_tokens,

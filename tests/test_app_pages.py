@@ -211,3 +211,35 @@ def test_bad_key_falls_back_to_rules_and_says_why(fresh_db, monkeypatch):
     assert at.session_state["profile_source"] == "fallback" and "OPENROUTER_API_KEY" in at.session_state["profile_error"]
     assert at.session_state["profile"]["category"] == "sportswear"          # rule-based result is still usable
     assert any("AI analysis failed" in w.value for w in at.warning)
+
+
+def test_openrouter_404_on_forced_tool_choice_still_gives_an_ai_profile(fresh_db, monkeypatch):
+    """The real-world failure: 'No endpoints found that support the provided tool_choice value'. The app must recover."""
+    import json as _json
+    import requests
+    calls = []
+    profile = {"product_name": "Fallback Shoe", "category": "sportswear", "summary": "AI summary.", "goal": "sales", "target_countries": ["AT"],
+               "target_audience": {"description": "runners"}, "relevant_niches": ["running"], "tone": ["casual"],
+               "restrictions": {"excluded_flag_types": []}}
+
+    class R:
+        def __init__(self, status, data):
+            self.status_code, self._d = status, data
+
+        def json(self):
+            return self._d
+
+    def post(url, headers=None, json=None, timeout=None):
+        calls.append(json)
+        if isinstance(json.get("tool_choice"), dict):           # forced function choice: rejected like OpenRouter did
+            return R(404, {"error": {"message": "No endpoints found that support the provided 'tool_choice' value.", "code": 404}})
+        return R(200, {"choices": [{"message": {"role": "assistant", "content": None, "tool_calls": [
+            {"id": "1", "type": "function", "function": {"name": "submit_profile", "arguments": _json.dumps(profile)}}]}}]})
+    monkeypatch.setattr(requests, "post", post)
+    at = page("1_Product_Brief")
+    at.secrets["OPENROUTER_API_KEY"] = "sk-or-test"
+    _analyze_sample(at)
+    assert_clean(at)
+    assert at.session_state["profile_source"] == "ai" and at.session_state["profile"]["product_name"] == "Fallback Shoe"
+    assert [c.get("tool_choice") for c in calls][:2] == [{"type": "function", "function": {"name": "submit_profile"}}, "required"]
+    assert not any("AI analysis failed" in w.value for w in at.warning)

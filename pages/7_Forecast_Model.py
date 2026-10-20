@@ -7,10 +7,10 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from core import charts, components as C, config, forest, predict, ui
+from core import charts, components as C, config, forest, predict, tables, ui
 
 ui.page_config("Forecast model", ":material/forest:")
-ui.sidebar()
+ui.chrome()
 ss = st.session_state
 
 ui.header("Forecast model: random forest", "How the app predicts a creator's real reach and conversions, how you can check it, and when it is not used.", eyebrow="Insights")
@@ -95,7 +95,7 @@ with t_how:
     tree = forest.small_tree(fm_show, max_depth=depth)
     nodes, edges = forest.tree_nodes(tree, fm_show.features, fm_show.target)
     with tc2:
-        st.plotly_chart(charts.tree_figure(nodes, edges), width="stretch")
+        st.plotly_chart(charts.tree_figure(nodes, edges), theme=None, width="stretch")
     st.caption(("Leaves show the reach multiplier: x0.80 means 20% less reach than the naive forecast. " if which == "Reach"
                 else "Leaves show expected conversions per 1,000 reached people. ") +
                "n is the number of past results in that leaf. A single tree like this is easy to read but unstable: a few different "
@@ -116,7 +116,7 @@ with t_how:
         mu, lo, hi = (float(a[0]) for a in reach.interval(row))
         with col:
             st.markdown(f"**{name}**")
-            st.plotly_chart(charts.votes_hist(votes, mu, lo, hi, "reach"), width="stretch", key=f"votes_{name[:6]}_{len(name)}")
+            st.plotly_chart(charts.votes_hist(votes, mu, lo, hi, "reach"), theme=None, width="stretch", key=f"votes_{name[:6]}_{len(name)}")
             st.caption(f"Forecast: **x{np.exp(mu):.2f}** the naive reach (80% range x{np.exp(lo):.2f} to x{np.exp(hi):.2f}).")
 
     C.step_header(5, "Is it any good? An honest test", "Every number below comes from campaigns the model had not seen.")
@@ -127,15 +127,11 @@ with t_how:
     sel = st.radio("Target", ["Reach", "Conversions"], horizontal=True, key="m_eval_target")
     fm_eval = reach if sel == "Reach" else conv
     m = fm_eval.metrics.copy()
-    st.plotly_chart(charts.metrics_bar(m), width="stretch")
-    st.dataframe(m[["method", "rmse", "mae", "coverage", "rmse_gain_vs_best_baseline"]], hide_index=True, width="stretch",
-                 column_config={"method": "Method", "rmse": st.column_config.NumberColumn("Typical error (RMSE)", format="%.3f"),
-                                "mae": st.column_config.NumberColumn("Average error (MAE)", format="%.3f"),
-                                "coverage": st.column_config.NumberColumn("80% range hit rate", format="percent"),
-                                "rmse_gain_vs_best_baseline": st.column_config.NumberColumn("Better than best baseline", format="percent")})
+    st.plotly_chart(charts.metrics_bar(m), theme=None, width="stretch")
+    tables.show(m[["method", "rmse", "mae", "coverage", "rmse_gain_vs_best_baseline"]], formats={"rmse": "%.3f", "mae": "%.3f"})
     st.caption("Errors are measured on the log scale of the multiplier, so 0.30 is roughly a 35% typical miss. "
                "The hit rate should be close to 80%: much lower means the range is too narrow, much higher means it is too wide.")
-    st.plotly_chart(charts.oof_scatter(fm_eval.oof, fm_eval.target), width="stretch")
+    st.plotly_chart(charts.oof_scatter(fm_eval.oof, fm_eval.target), theme=None, width="stretch")
     st.caption("Each dot is one past result. Dots near the dashed line were predicted well. The model never saw these campaigns when predicting them.")
     rule = (f"**Decision rule in the app:** the forest is only used where it cuts the cross-validated error by at least {forest.MIN_GAIN:.0%} versus the "
             "best simple method. Right now: "
@@ -150,13 +146,13 @@ with t_drive:
                 "A big increase means the model relies on that input.")
     tgt = st.radio("Model", ["Reach", "Conversions"], horizontal=True, key="m_drive_target")
     fm = reach if tgt == "Reach" else conv
-    st.plotly_chart(charts.importance_bar(fm.importance), width="stretch")
+    st.plotly_chart(charts.importance_bar(fm.importance), theme=None, width="stretch")
     top = fm.importance.head(3).label.tolist()
     st.markdown(f"For this model the most important inputs are **{top[0]}**, **{top[1]}** and **{top[2]}**.")
     st.subheader("What does the model do with one input?")
     feat = st.selectbox("Input", fm.importance.feature.tolist(), format_func=lambda f: forest.FEATURE_LABELS[f], key="m_pdp_feature")
     pdp = forest.partial_dependence(fm, feat)
-    st.plotly_chart(charts.pdp_line(pdp, feat, fm.target, forest.display_value), width="stretch")
+    st.plotly_chart(charts.pdp_line(pdp, feat, fm.target, forest.display_value), theme=None, width="stretch")
     st.caption("Partial dependence: the average forecast if every past creator had this value, other inputs unchanged. "
                + ("The dotted line is 'no change versus the naive forecast'." if fm.target == "reach" else "The dotted line is the average over all values."))
     st.warning("These are patterns in your data, not proof of cause. For example, fake followers may simply be a symptom of other problems. "
@@ -187,17 +183,15 @@ with t_try:
         a, b = st.columns(2)
         with a:
             st.markdown("**What all trees say**")
-            st.plotly_chart(charts.votes_hist(reach.tree_votes(Xp.iloc[[0]]), mu, lo, hi, "reach"), width="stretch", key="cand_votes")
+            st.plotly_chart(charts.votes_hist(reach.tree_votes(Xp.iloc[[0]]), mu, lo, hi, "reach"), theme=None, width="stretch", key="cand_votes")
         with b:
             st.markdown("**Why? Each input versus a typical creator**")
             eff = forest.local_effects(reach, Xp.iloc[[0]], reach.X)
-            st.plotly_chart(charts.effects_bar(eff), width="stretch", key="cand_eff")
-        st.dataframe(eff.head(6).assign(value=[forest.display_value(f, v) for f, v in zip(eff.head(6).feature, eff.head(6).value)],
-                                        typical=[forest.display_value(f, v) for f, v in zip(eff.head(6).feature, eff.head(6).typical)],
-                                        effect=lambda d: (np.exp(d.effect) - 1))[["label", "value", "typical", "effect"]],
-                     hide_index=True, width="stretch",
-                     column_config={"label": "Input", "value": "This creator", "typical": "Typical creator",
-                                    "effect": st.column_config.NumberColumn("Effect on forecast", format="percent")})
+            st.plotly_chart(charts.effects_bar(eff), theme=None, width="stretch", key="cand_eff")
+        tables.show(eff.head(6).assign(value=[forest.display_value(f, v) for f, v in zip(eff.head(6).feature, eff.head(6).value)],
+                                       typical=[forest.display_value(f, v) for f, v in zip(eff.head(6).feature, eff.head(6).typical)],
+                                       effect=lambda d: (np.exp(d.effect) - 1))[["label", "value", "typical", "effect"]],
+                    labels={"label": "Input", "value": "This creator", "typical": "Typical creator", "effect": "Effect on forecast"}, ratio=["effect"])
         st.caption("Method: replace one input at a time by the typical value and see how the forecast changes (an 'occlusion' test). "
                    "It is a simple explanation, not an exact decomposition.")
 

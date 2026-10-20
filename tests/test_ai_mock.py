@@ -88,12 +88,82 @@ def test_tool_arguments_may_arrive_as_dict_or_in_the_text(http):
 
 
 def test_no_structured_answer_is_an_error(http):
-    http.queue = [FakeResp(200, completion({"content": "I cannot do that."}))]
+    http.queue = [FakeResp(200, completion({"content": "I cannot do that."}))]          # then default replies: plain "ok", no JSON
     with pytest.raises(ai.OpenRouterError, match="structured"):
         client().complete_tool(ai.PROFILE_TOOL, "x")
-    http.queue = [FakeResp(200, {"choices": []})]
-    with pytest.raises(ai.OpenRouterError, match="Empty"):
+
+
+NO_ENDPOINTS = {"error": {"message": "No endpoints found that support the provided 'tool_choice' value. "
+                                     "To learn more about provider routing, visit: https://openrouter.ai/docs/guides/routing/provider-selection", "code": 404}}
+GOOD = {"goal": "sales", "budget_eur": 5000}
+
+
+def test_forced_tool_choice_not_supported_steps_down_to_required(http):
+    """The exact failure from OpenRouter: no provider accepts a forced function choice for this model."""
+    http.queue = [FakeResp(404, NO_ENDPOINTS), FakeResp(200, completion(tool_message("submit_profile", json.dumps(GOOD))))]
+    c = client()
+    assert c.complete_tool(ai.PROFILE_TOOL, "brief") == GOOD
+    assert http.calls[0]["json"]["tool_choice"] == {"type": "function", "function": {"name": "submit_profile"}}
+    assert http.calls[1]["json"]["tool_choice"] == "required" and http.calls[1]["json"]["provider"] == {"require_parameters": True}
+    assert c.tool_mode == "required"
+
+
+def test_steps_down_to_auto_with_an_instruction_then_to_plain_json(http):
+    http.queue = [FakeResp(404, NO_ENDPOINTS), FakeResp(404, NO_ENDPOINTS),
+                  FakeResp(200, completion(tool_message("submit_profile", json.dumps(GOOD))))]
+    c = client()
+    assert c.complete_tool(ai.PROFILE_TOOL, "brief") == GOOD
+    auto = http.calls[2]["json"]
+    assert auto["tool_choice"] == "auto" and auto["provider"] == {"require_parameters": False}
+    assert "calling the function submit_profile" in auto["messages"][1]["content"] and c.tool_mode == "auto"
+
+    http.calls.clear()
+    http.queue = [FakeResp(404, NO_ENDPOINTS)] * 3 + [FakeResp(200, completion({"content": '```json\n{"goal": "traffic"}\n```'}))]
+    c2 = client()
+    assert c2.complete_tool(ai.PROFILE_TOOL, "brief") == {"goal": "traffic"}
+    plain = http.calls[3]["json"]
+    assert "tools" not in plain and "tool_choice" not in plain and "provider" not in plain
+    assert "JSON schema" in plain["messages"][1]["content"] and '"product_name"' in plain["messages"][1]["content"] and c2.tool_mode == "json"
+
+
+def test_a_model_that_answers_in_text_on_auto_is_still_understood(http):
+    http.queue = [FakeResp(404, NO_ENDPOINTS), FakeResp(404, NO_ENDPOINTS), FakeResp(200, completion({"content": 'Sure: {"goal": "awareness"}'}))]
+    assert client().complete_tool(ai.PROFILE_TOOL, "x") == {"goal": "awareness"}
+
+
+def test_the_working_mode_is_remembered_for_later_calls(http):
+    http.queue = [FakeResp(404, NO_ENDPOINTS), FakeResp(200, completion(tool_message("submit_profile", json.dumps(GOOD))))]
+    c = client()
+    c.complete_tool(ai.PROFILE_TOOL, "first")
+    http.calls.clear()
+    http.queue = [FakeResp(200, completion(tool_message("submit_profile", json.dumps(GOOD))))]
+    assert c.complete_tool(ai.PROFILE_TOOL, "second") == GOOD
+    assert len(http.calls) == 1 and http.calls[0]["json"]["tool_choice"] == "required"      # straight to what worked, no more failures
+
+
+def test_a_remembered_mode_that_stops_working_falls_back_again(http):
+    c = client()
+    c.tool_mode = "json"
+    http.queue = [FakeResp(200, completion({"content": "no json here"})),                      # json mode fails
+                  FakeResp(200, completion(tool_message("submit_profile", json.dumps(GOOD))))]   # forced works
+    assert c.complete_tool(ai.PROFILE_TOOL, "x") == GOOD and c.tool_mode == "forced"
+
+
+@pytest.mark.parametrize("status", [401, 402, 429])
+def test_problems_a_different_mode_cannot_fix_are_raised_at_once(http, status):
+    http.queue = [FakeResp(status, {"error": {"message": "nope"}})] * 4
+    with pytest.raises(ai.OpenRouterError):
         client().complete_tool(ai.PROFILE_TOOL, "x")
+    assert len(http.calls) in (1, 3)          # one call, or the three transient retries for 429; never a walk down the ladder
+
+
+def test_when_every_mode_fails_the_error_names_the_model_and_the_fix(http):
+    http.queue = [FakeResp(404, NO_ENDPOINTS)] * 4
+    with pytest.raises(ai.OpenRouterError) as e:
+        client().complete_tool(ai.PROFILE_TOOL, "x")
+    msg = str(e.value)
+    assert "anthropic/claude-sonnet-5.5" in msg and "supported_parameters=tools" in msg and "tool_choice" in msg
+    assert len(http.calls) == 4
 
 
 @pytest.mark.parametrize("status,needle", [(401, "OPENROUTER_API_KEY"), (402, "credits"), (404, "tool calling"), (403, "refused")])

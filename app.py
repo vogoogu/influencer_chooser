@@ -1,6 +1,6 @@
 """Influencer Chooser: entry point and router. Run with `streamlit run app.py`.
 
-Navigation is grouped (Workflow / Insights) and keeps the original URLs. Each page is a standalone script in pages/."""
+Navigation lives in the header (Workflow and Insights dropdowns) and keeps the original URLs. Each page is a standalone script in pages/."""
 import sys
 from pathlib import Path
 
@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT))
 import streamlit as st
 
 st.set_page_config(page_title="Influencer Chooser", page_icon=str(ROOT / "static" / "icon.svg"), layout="wide",
-                   initial_sidebar_state="auto")
+                   initial_sidebar_state="collapsed")
 st.logo(str(ROOT / "static" / "logo.svg"), icon_image=str(ROOT / "static" / "icon.svg"), size="large")
 
 pages = {
@@ -27,4 +27,4 @@ pages = {
         st.Page("pages/7_Forecast_Model.py", title="Forecast model", icon=":material/forest:", url_path="Forecast_Model"),
     ],
 }
-st.navigation(pages, position="sidebar", expanded=True).run()
+st.navigation(pages, position="top").run()

@@ -8,10 +8,10 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from core import ai, charts, components as C, config, db, scoring, ui
+from core import ai, charts, components as C, config, db, scoring, tables, ui
 
 ui.page_config("Shortlist", ":material/list_alt:")
-ui.sidebar()
+ui.chrome()
 ss = st.session_state
 
 ui.header("Shortlist", "Hard filters remove creators that cannot be used. The rest are scored on seven criteria you can re-weight live.", step=2)
@@ -128,7 +128,7 @@ with right:
             parts = list(r.conflicts) + list(r.data_warnings) + [f"flag: {t.replace('_', ' ')} ({s})" for t, s in r.safety_flags]
             return "; ".join(parts)
         show = ranked.assign(notes=ranked.apply(notes, axis=1),
-                             platform_label=ranked.platform.str.title(),
+                             platform_label=ranked.platform.map(lambda p: tables.BRAND_CASE.get(p, p)),
                              reach_range=ranked.apply(lambda r: f"{r.reach_p10:,.0f} to {r.reach_p90:,.0f}", axis=1))
         table = show[["rank", "name", "platform_label", "followers", "er", "price", "reach_p50", "reach_range", "total", "notes"]]
         ev = st.dataframe(
@@ -175,11 +175,8 @@ with right:
 
     # ---------------------------------------------------------------- breakdown
     with t_break:
-        st.plotly_chart(charts.contributions_bar(ranked), width="stretch")
-        cc = {c: st.column_config.ProgressColumn(config.CRITERIA_LABELS[c], min_value=0.0, max_value=1.0, format="%.2f")
-              for c in config.CRITERIA}
-        st.dataframe(ranked[["rank", "name", "platform"] + config.CRITERIA].head(30), hide_index=True, width="stretch",
-                     column_config={"rank": "#", "name": "Creator", "platform": "Platform", **cc})
+        st.plotly_chart(charts.contributions_bar(ranked), theme=None, width="stretch")
+        tables.show(ranked[["rank", "name", "platform"] + config.CRITERIA].head(30), score=config.CRITERIA, labels=config.CRITERIA_LABELS, height=420)
         with st.expander("What do the criteria mean?"):
             for c in config.CRITERIA:
                 st.markdown(f"**{config.CRITERIA_LABELS[c]}**: {config.CRITERIA_HELP[c]}")
@@ -189,30 +186,25 @@ with right:
         rows = ranked.iloc[sel_rows] if sel_rows else ranked.head(3)
         rows = rows.head(6)
         st.caption("Showing the selected creators." if sel_rows else "Showing the top 3. Select rows in the Ranking tab to choose others (max 6).")
-        st.plotly_chart(charts.radar(rows), width="stretch")
-        st.dataframe(rows[["name", "platform", "followers", "er", "fake", "price", "cpm", "female_pct", "age_25_34", "relationship_score"]],
-                     hide_index=True, width="stretch",
-                     column_config={"name": "Creator", "er": "Engagement %", "fake": "Fake followers %", "price": "Fee (EUR)",
-                                    "cpm": st.column_config.NumberColumn("EUR per 1,000 reach", format="%.0f"),
-                                    "female_pct": "Women %", "age_25_34": "Age 25-34 %", "relationship_score": "Relationship"})
+        st.plotly_chart(charts.radar(rows), theme=None, width="stretch")
+        tables.show(rows[["name", "platform", "followers", "er", "fake", "price", "cpm", "female_pct", "age_25_34", "relationship_score"]],
+                    formats={"cpm": "%.0f"})
 
     # ---------------------------------------------------------------- stability
     with t_stab:
         st.markdown(f"**Top-5 stability: {stab['stability']:.0%}.** "
                     "Weights are an opinion, so the tool tests whether the shortlist survives different opinions. "
                     "It draws 400 random weight sets around yours and counts how often each creator stays in the top 5.")
-        st.plotly_chart(charts.stability_bar(ranked, stab["top_freq"]), width="stretch")
+        st.plotly_chart(charts.stability_bar(ranked, stab["top_freq"]), theme=None, width="stretch")
         st.markdown("**Which weight matters most?** How many of the current top 5 change if one weight is doubled or set to zero:")
-        st.plotly_chart(charts.sensitivity_bar(scoring.weight_sensitivity(ranked, ui.weights())), width="stretch")
+        st.plotly_chart(charts.sensitivity_bar(scoring.weight_sensitivity(ranked, ui.weights())), theme=None, width="stretch")
 
     # ---------------------------------------------------------------- filtered out
     with t_out:
         counts = excluded.exclude_reason.value_counts()
         st.markdown(f"**{len(excluded)} accounts were filtered out.** Each is listed with the first rule it failed.")
         st.bar_chart(counts, horizontal=True, color="#1B7F6B")
-        st.dataframe(excluded[["name", "platform", "country", "followers", "price", "exclude_reason"]].sort_values("exclude_reason"),
-                     hide_index=True, width="stretch",
-                     column_config={"name": "Creator", "price": "Fee (EUR)", "exclude_reason": "Reason"})
+        tables.show(excluded[["name", "platform", "country", "followers", "price", "exclude_reason"]].sort_values("exclude_reason"), height=420)
 
 st.write("")
 if st.button("Continue to the campaign mix", type="primary", icon=":material/arrow_forward:", key="short_continue"):

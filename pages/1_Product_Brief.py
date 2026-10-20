@@ -10,7 +10,7 @@ from core import ai, components as C, config, db, documents, fx, ui
 from core.taxonomy import CATEGORIES, NICHES
 
 ui.page_config("Product brief", ":material/description:")
-ui.sidebar()
+ui.chrome()
 ss = st.session_state
 
 ui.header("Product brief", "Give the tool a brief. It extracts a structured profile that drives the filters, the scoring and the "

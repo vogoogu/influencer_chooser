@@ -1,10 +1,37 @@
 # Design system
 
 The interface is built for analysts who compare many numbers and defend a decision: calm, dense where it has to be, with
-the answer first and the controls beside it. Everything below lives in two files: `core/theme.py` (tokens and CSS) and
-`core/components.py` (HTML building blocks). Pages only compose them, so the look stays consistent.
+the answer first and the controls beside it. Everything below lives in three files: `core/theme.py` (tokens and CSS),
+`core/components.py` (HTML building blocks) and `core/tables.py` (one formatter for every data table). Pages only compose
+them, so the look stays consistent.
 
 ![Shortlist](screenshots/shortlist.jpg)
+
+## Navigation and menu
+
+Navigation is a header bar (`st.navigation(position="top")`): Overview, a Workflow dropdown (Product brief, Shortlist, Campaign mix,
+Decision log) and an Insights dropdown (Explorer, Calibration, Forecast model). URLs are unchanged. On the right of the header,
+`ui.chrome()` pins an AI status chip and a **Menu** popover with the AI settings (use AI, OpenRouter key, model), data information and the
+database reset. There is no sidebar on desktop; on phones Streamlit folds the header navigation into a drawer.
+
+![Header navigation](screenshots/header-nav.jpg)
+
+![Menu](screenshots/header-menu.jpg)
+
+## Tables
+
+Every plain table goes through `core/tables.py`, so tables read the same everywhere:
+
+| Problem in a raw dataframe | What the formatter does |
+|---|---|
+| database names (`price_eur`, `usage_rights_months`) | sentence-case labels with units ("Fee (EUR)", "Usage rights (months)") |
+| bare numbers (`15000`, `0.192`) | thousands separators, whole percentages, `0.87×` multipliers, score bars |
+| ISO timestamps | real dates and `2026-10-20 07:26` |
+| `1`/`0`, `None` | Yes/No and a dash |
+| `plant_based_food`, `tiktok` | `plant based food`, `TikTok` |
+
+Rules are by column name, with per-call overrides (`formats`, `widths`, `ratio`, `hide`, `order`). The ranking and mix tables are hand-configured
+because they need selection and score bars; they use the same formats.
 
 ## Principles
 
@@ -55,11 +82,10 @@ empty (`empty_state`), success/warning/error (tinted alerts with icons), and a `
 | Width | Behaviour |
 |---|---|
 | above 1100 px | full layout, sticky rails |
-| 1000 px and below | rail layouts stack, header clearance for the collapsed sidebar |
+| 1000 px and below | rail layouts stack below the header |
 | 900 px and below | two-column grids wrap to 50 %, stepper shows only the current label |
-| 640 px and below | single column, KPI cards stay two per row |
+| 640 px and below | single column, KPI cards stay two per row, header navigation becomes a drawer |
 
-The sidebar uses `initial_sidebar_state="auto"` and collapses on small screens.
 
 ![Phone](screenshots/phone-home.jpg)
 
@@ -67,7 +93,8 @@ The sidebar uses `initial_sidebar_state="auto"` and collapses on small screens.
 
 * The stylesheet is injected with `st.markdown(..., unsafe_allow_html=True)`. `st.html` strips a leading `<style>` and inline `<svg>`,
   so icons are CSS masks (`ic-ico-<name>`).
-* Selectors rely on Streamlit's `data-testid` attributes (for example `stMetric`, `stSidebarNavLink`, `stTextInputRootElement`).
-  They were verified on Streamlit 1.65. After a major Streamlit upgrade, run the app and check inputs, tabs and the sidebar first.
+* Selectors rely on Streamlit's `data-testid` attributes (for example `stMetric`, `stTopNavLink`, `stTextInputRootElement`).
+  They were verified on Streamlit 1.65. After a major Streamlit upgrade, run the app and check inputs, tabs and the header first.
+* Charts get an explicit white canvas in `core/charts.py`, because Streamlit's chart theme would otherwise paint its own background.
 * Cards are addressed by key (`card-1`, `card-2`, `rail_*`, `hero_*`) because a bordered container has no wrapper element of its own.
 * `tests/test_theme.py` fails if the stylesheet stops rendering (a bare `%` in the CSS template once broke every page).

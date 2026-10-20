@@ -1,4 +1,4 @@
-"""Streamlit helpers shared by all pages: session state, sidebar, settings objects."""
+"""Streamlit helpers shared by all pages: session state, header chrome, settings objects."""
 from __future__ import annotations
 
 import json
@@ -117,12 +117,12 @@ def settings_from_key(key: str) -> FilterSettings:
 
 # ----------------------------------------------------------------------------- AI client
 def active_model() -> str:
-    """Model slug: secret or env var OPENROUTER_MODEL, else the sidebar field, else the default."""
+    """Model slug: secret or env var OPENROUTER_MODEL, else the Menu field, else the default."""
     return (config.get_secret("OPENROUTER_MODEL") or st.session_state.get("ui_model") or config.DEFAULT_MODEL).strip()
 
 
 def ai_client():
-    """OpenRouter client from secrets/env or the sidebar field, or None (rule-based mode)."""
+    """OpenRouter client from secrets/env or the Menu field, or None (rule-based mode)."""
     ss = st.session_state
     if not ss.get("use_ai", True):
         return None
@@ -149,7 +149,7 @@ def ai_badge(source: str | None, error: str | None = None) -> None:
 def page_config(title: str, icon: str) -> None:
     """set_page_config that is safe under st.navigation (the router already set it) and when run standalone."""
     try:
-        st.set_page_config(page_title=f"{title} | Influencer Chooser", page_icon=icon, layout="wide", initial_sidebar_state="auto")
+        st.set_page_config(page_title=f"{title} | Influencer Chooser", page_icon=icon, layout="wide", initial_sidebar_state="collapsed")
     except Exception:
         pass
 
@@ -194,20 +194,26 @@ def card(key: str | None = None):
     return st.container(border=True, key=key)
 
 
-def sidebar() -> None:
-    """Theme + the part of the sidebar below the navigation: workspace status, AI settings, data."""
+def chrome() -> None:
+    """Theme plus the header utilities: AI status and a Menu popover (AI settings, data, reset).
+    Navigation itself lives in the header too (see app.py)."""
     init_state()
     st.session_state["_card_i"] = 0                    # restart the card key counter on every run
     apply_theme()
     client = ai_client()
-    with st.sidebar:
-        C.panel_title("Workspace")
+    with st.container(key="topbar", horizontal=True, vertical_alignment="center", gap="small"):
         if client:
-            C.chips([("AI active via OpenRouter", "success", "check"), (active_model(), "outline")])
+            st.html(C.chips_html([("AI active", "success", "check")]))
         else:
-            C.chips([("Rule-based mode", "neutral", "info")])
-            st.caption("No API key set. The brief is read by keyword rules and text is template-based.")
-        with st.expander("AI assistant", icon=":material/smart_toy:"):
+            st.html(C.chips_html([("Rule-based mode", "neutral", "info")]))
+        with st.popover("Menu", icon=":material/tune:"):
+            C.panel_title("AI assistant")
+            if client:
+                C.chips([("Active via OpenRouter", "success", "check"), (active_model(), "outline")])
+                if getattr(client, "tool_mode", None):
+                    st.caption(f"Structured answers use: {client.tool_mode.replace('json', 'plain JSON')} mode.")
+            else:
+                st.caption("No API key set: keyword rules and templates are used instead of AI.")
             has_secret = bool(config.get_secret("OPENROUTER_API_KEY"))
             st.checkbox("Use AI", key="use_ai", help="Off = rule-based mode, nothing leaves your machine.")
             if st.session_state.use_ai and not has_secret:
@@ -220,17 +226,20 @@ def sidebar() -> None:
                 st.text_input("Model", key="ui_model",
                               help="Any OpenRouter model slug that supports tool calling, for example anthropic/claude-sonnet-5.5 "
                                    "or openai/gpt-5.2. See openrouter.ai/models.")
-        synthetic = _is_synthetic()
-        C.chips([(f"Data as of {db.as_of().isoformat()}", "outline"), *([("Synthetic", "warning")] if synthetic else [])])
-        with st.expander("Reset demo database", icon=":material/restart_alt:"):
-            st.caption("Deletes saved decisions and logged results and restores the original dataset.")
-            if st.button("Reset now", key="reset_db_btn"):
+            st.divider()
+            C.panel_title("Data")
+            C.chips([(f"As of {db.as_of().isoformat()}", "outline"), *([("Synthetic", "warning")] if _is_synthetic() else [])])
+            if st.button("Reset now", key="reset_db_btn", icon=":material/restart_alt:",
+                         help="Deletes saved decisions and logged results and restores the original dataset."):
                 db.reset_db()
                 st.cache_data.clear()
                 for k in ("explanations", "memo_text", "challenges"):
                     st.session_state[k] = {} if k == "explanations" else None
                 st.toast("Database reset")
                 st.rerun()
+
+
+sidebar = chrome        # old name, kept for compatibility
 
 
 def _is_synthetic() -> bool:
@@ -245,7 +254,7 @@ def page_link(path: str, label: str, icon: str | None = None) -> None:
     try:
         st.page_link(path, label=label, icon=icon)
     except Exception:
-        st.caption(f"{label} (use the sidebar navigation)")
+        st.caption(f"{label} (use the menu in the header)")
 
 
 def need_profile() -> bool:

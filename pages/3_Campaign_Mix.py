@@ -7,10 +7,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pandas as pd
 import streamlit as st
 
-from core import ai, charts, components as C, config, db, optimizer, report, scoring, simulation, ui
+from core import ai, charts, components as C, config, db, optimizer, report, scoring, simulation, tables, ui
 
 ui.page_config("Campaign mix", ":material/tune:")
-ui.sidebar()
+ui.chrome()
 ss = st.session_state
 
 ui.header("Campaign mix", "Choose the combination of creators that gets the most out of the budget, see the range of outcomes "
@@ -97,7 +97,8 @@ with main:
                 icon=":material/compare_arrows:")
 
     st.dataframe(
-        mix[["rank", "name", "platform", "deliverable", "price", "reach_p50", "reach_p10", "reach_p90", "exp_conversions", "total"]],
+        mix[["rank", "name", "platform", "deliverable", "price", "reach_p50", "reach_p10", "reach_p90", "exp_conversions", "total"]]
+        .assign(platform=lambda d: d.platform.map(lambda p: tables.BRAND_CASE.get(p, p))),
         hide_index=True, width="stretch",
         column_config={"rank": st.column_config.NumberColumn("#", width=40), "name": st.column_config.TextColumn("Creator", width=140),
                        "platform": st.column_config.TextColumn("Platform", width=76), "deliverable": st.column_config.TextColumn("Format", width=88),
@@ -131,13 +132,13 @@ with main:
         if sm["p_below_target"] is not None:
             st.metric(f"Chance of missing the target of {target:,.0f}", f"{sm['p_below_target']:.0%}")
     t1, t2, t3 = st.tabs(["Reach", "Conversions", "Sensitivity"])
-    t1.plotly_chart(charts.reach_hist(sim["reach"], sm, float(mix.price.sum())), width="stretch")
-    t2.plotly_chart(charts.conv_hist(sim["conversions"], sm), width="stretch")
+    t1.plotly_chart(charts.reach_hist(sim["reach"], sm, float(mix.price.sum())), theme=None, width="stretch")
+    t2.plotly_chart(charts.conv_hist(sim["conversions"], sm), theme=None, width="stretch")
     with t3:
         metric = st.radio("Measure", ["Median conversions", "Chance of missing the naive forecast"], horizontal=True, key="m_tornado_metric")
         key = "conv_p50" if metric.startswith("Median") else "p_below_quote"
         tor = simulation.tornado(mix, goal, metric=key, naive_quote=naive)
-        st.plotly_chart(charts.tornado_chart(tor, metric, ",.0f" if key == "conv_p50" else ".0%"), width="stretch")
+        st.plotly_chart(charts.tornado_chart(tor, metric, ",.0f" if key == "conv_p50" else ".0%"), theme=None, width="stretch")
         st.caption("Each bar changes one assumption while the others stay fixed. Long bars are the assumptions worth checking before committing budget.")
 
     # --------------------------------------------------------------------------- devil's advocate

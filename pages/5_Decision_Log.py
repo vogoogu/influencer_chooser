@@ -9,10 +9,10 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from core import components as C, config, db, ui
+from core import components as C, config, db, tables, ui
 
 ui.page_config("Decision log", ":material/history:")
-ui.sidebar()
+ui.chrome()
 
 ui.header("Decision log", "Every saved decision is an audit trail. Convert it into a campaign, then log what really happened. "
           "Those results feed the calibration page and make future forecasts better.", step=4)
@@ -28,10 +28,8 @@ with t_runs:
         C.empty_state("No decisions saved yet", "Build a mix on the Campaign mix page and press Save decision. Saved decisions keep the brief, the weights and the forecasts.", "history")
         ui.page_link("pages/3_Campaign_Mix.py", label="Go to the campaign mix", icon=":material/arrow_forward:")
     else:
-        st.dataframe(runs, hide_index=True, width="stretch",
-                     column_config={"id": "#", "created_at": "Saved", "title": "Title", "brand": "Client brand",
-                                    "budget_eur": st.column_config.NumberColumn("Budget (EUR)", format="%d"),
-                                    "campaign_id": "Campaign id", "creators": "Creators"})
+        tables.show(runs.assign(status=runs.campaign_id.map(lambda x: "Converted to campaign" if x == x and x else "Draft")).drop(columns=["campaign_id"]),
+                    labels={"brand": "Client brand"}, order=["id", "created_at", "title", "brand", "objective", "budget_eur", "creators", "status"])
         run_id = st.selectbox("Open a decision", runs.id.tolist(), format_func=lambda i: f"#{i}  {runs.set_index('id').title[i]}")
         run = db.read("SELECT * FROM run WHERE id = ?", (int(run_id),)).iloc[0]
         items = db.read("""SELECT i.rank, inf.display_name AS name, a.platform, i.deliverable, i.fee_eur, i.reach_p10, i.reach_p50, i.reach_p90,
@@ -41,20 +39,19 @@ with t_runs:
         c1, c2 = st.columns([2, 1])
         with c1:
             C.panel_title("Chosen mix")
-            st.dataframe(items[items.selected == 1].drop(columns=["selected", "criterion_scores", "ai_explanation"]), hide_index=True, width="stretch")
+            tables.show(items[items.selected == 1].drop(columns=["selected", "criterion_scores", "ai_explanation"]), widths={"total_score": 110, "name": 130})
             if run.notes:
                 st.info(f"Notes: {run.notes}")
         with c2:
             C.panel_title("Weights used")
             w = json.loads(run.weights_json)
-            st.dataframe(pd.DataFrame({"criterion": [config.CRITERIA_LABELS[k] for k in w], "weight": [round(v, 3) for v in w.values()]}),
-                         hide_index=True, width="stretch")
+            tables.show(pd.DataFrame({"criterion": [config.CRITERIA_LABELS[k] for k in w], "weight": list(w.values())}))
             st.caption(f"Objective: {run.objective}. Model: {run.model_version}.")
         with st.expander("Brief and profile stored with this decision"):
             st.code(run.brief_text or "(none)", language="markdown")
             st.json(json.loads(run.profile_json) if run.profile_json else {})
         with st.expander(f"All {len(items)} scored candidates in this decision"):
-            st.dataframe(items.drop(columns=["criterion_scores", "ai_explanation"]), hide_index=True, width="stretch")
+            tables.show(items.drop(columns=["criterion_scores", "ai_explanation"]), height=360)
 
         C.section("Convert into a campaign", "Creates a planned campaign with the chosen creators and their forecasts, ready for results.")
         if run.campaign_id:

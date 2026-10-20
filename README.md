@@ -24,7 +24,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Optional: add your OpenRouter key to enable the AI features. Either paste it into the sidebar (kept for the
+Optional: add your OpenRouter key to enable the AI features. Either paste it into the header Menu (kept for the
 browser session only), or copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml`.
 
 First steps in the app: **Product brief** → pick a sample brief → *Load sample brief* → *Analyze brief* →
@@ -108,7 +108,7 @@ rule-based mode and everything still works.
    ```
 
    Locally: copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml`, or set the same names as environment variables.
-3. In the app, the sidebar shows "AI active via OpenRouter" and the model in use. With no secret set, the sidebar offers key and model fields
+3. In the app, the header shows "AI active" and the Menu shows the model in use. With no secret set, the Menu offers key and model fields
    (kept for the browser session only).
 
 How it calls the API: `POST https://openrouter.ai/api/v1/chat/completions` with a forced function call for structured answers
@@ -117,7 +117,10 @@ research adds OpenRouter's `openrouter:web_search` server tool (billed by OpenRo
 a tool call it is still accepted. Failures (bad key, no credits, unknown model, rate limits) are shown in plain words and the app falls back to
 rule-based text.
 
-Choose a model that supports tool calling, otherwise structured answers fail and the app silently uses the rule-based fallback (the page tells you).
+Some models have no provider that accepts a *forced* function choice (OpenRouter then answers 404 "No endpoints found that support the provided
+'tool_choice' value"). The client therefore steps down automatically and remembers what worked for the model: forced function call, then
+`tool_choice: "required"`, then `"auto"` with an instruction in the prompt, then plain JSON that is validated and parsed. The header Menu shows
+which mode is in use. If no mode works, the error names the model, and the app falls back to rule-based text.
 
 ## AI usage and privacy
 
@@ -129,15 +132,15 @@ Choose a model that supports tool calling, otherwise structured answers fail and
 | Filters, scores, rankings, optimisation, simulation, calibration, **random forest forecasts** | Python only (the AI never produces numbers) |
 
 The model receives only facts from the database and the brief, wrapped in tags and marked as data, not
-instructions. Turn off *Use AI* in the sidebar to keep everything local. Check GDPR before loading real
+instructions. Turn off *Use AI* in the header Menu to keep everything local. Check GDPR before loading real
 creator data: lawful basis, retention (`consent_until`), no private contact data.
 
 ## Configuration
 
 | Setting | How |
 |---|---|
-| API key | Streamlit secret or env var `OPENROUTER_API_KEY`, or the sidebar field (session only) |
-| Model | `OPENROUTER_MODEL` secret or env var, or the sidebar field (default `anthropic/claude-sonnet-5.5`) |
+| API key | Streamlit secret or env var `OPENROUTER_API_KEY`, or the header Menu field (session only) |
+| Model | `OPENROUTER_MODEL` secret or env var, or the header Menu field (default `anthropic/claude-sonnet-5.5`) |
 | Database | `INFLUENCER_DB` (default `data/working.sqlite`) |
 | Topic similarity | default TF-IDF; `EMBEDDING_BACKEND=sentence-transformers` after `pip install -r requirements-optional.txt` |
 | Assumed conversion rates per goal, staleness and spike thresholds | `core/config.py` |

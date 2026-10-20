@@ -65,9 +65,9 @@ def register_plotly_template() -> None:
     t.layout = go.Layout(
         font=dict(family=FONT, size=12.5, color=TOKENS["ink2"]),
         colorway=PALETTE, paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF",
-        xaxis=dict(gridcolor="#ECE9E2", zerolinecolor="#D3CFC5", linecolor="#D3CFC5", ticks="outside", tickcolor="#D3CFC5",
+        xaxis=dict(automargin=True, gridcolor="#ECE9E2", zerolinecolor="#D3CFC5", linecolor="#D3CFC5", ticks="outside", tickcolor="#D3CFC5",
                    title=dict(font=dict(size=12, color=TOKENS["muted"]), standoff=10)),
-        yaxis=dict(gridcolor="#ECE9E2", zerolinecolor="#D3CFC5", linecolor="rgba(0,0,0,0)", ticks="",
+        yaxis=dict(automargin=True, gridcolor="#ECE9E2", zerolinecolor="#D3CFC5", linecolor="rgba(0,0,0,0)", ticks="",
                    title=dict(font=dict(size=12, color=TOKENS["muted"]), standoff=10)),
         legend=dict(font=dict(size=12), bgcolor="rgba(0,0,0,0)"),
         hoverlabel=dict(bgcolor="#15191E", font=dict(family=FONT, size=12.5, color="#FFFFFF"), bordercolor="#15191E"),
@@ -93,7 +93,7 @@ CSS = """
 /* ---------- base ---------- */
 .stApp{background:var(--ic-canvas); color:var(--ic-ink);}
 html,body,.stApp,button,input,textarea,select{font-feature-settings:"cv11","ss03"; -webkit-font-smoothing:antialiased;}
-[data-testid="stMainBlockContainer"]{max-width:1280px; padding:1.4rem 2.2rem 4.5rem;}
+[data-testid="stMainBlockContainer"]{max-width:1280px; padding:4.7rem 2.2rem 4.5rem;}
 [data-testid="stHeader"]{background:transparent;}
 /* helper elements that only carry <style> must not add a gap */
 [data-testid="stElementContainer"]:has(> [data-testid="stHtml"] > style:only-child),
@@ -111,6 +111,23 @@ h1,h2,h3,h4{letter-spacing:-0.015em; color:var(--ic-ink);}
 h4{font-size:14px; font-weight:650; padding:.6rem 0 .2rem;}
 [data-testid="stCaptionContainer"],[data-testid="stCaptionContainer"] p{font-size:12.5px!important; color:var(--ic-muted)!important; line-height:1.5;}
 [data-testid="stMarkdownContainer"] code{background:var(--ic-neutral-bg); color:var(--ic-ink); border-radius:6px; padding:.1em .38em; font-size:.88em;}
+
+/* ---------- header navigation (st.navigation position="top") ---------- */
+[data-testid="stHeader"]{background:rgba(255,255,255,.94)!important; backdrop-filter:saturate(1.4) blur(8px); border-bottom:1px solid var(--ic-line); height:3.5rem; z-index:999990;}
+[data-testid="stToolbar"]{padding:0 1.2rem;}
+[data-testid="stTopNavLink"],[data-testid="stTopNavSection"]{border-radius:9px!important; font-size:14px; font-weight:560; color:var(--ic-ink2)!important; padding:.42rem .8rem!important; transition:background .12s,color .12s;}
+[data-testid="stTopNavLink"] p,[data-testid="stTopNavSection"] p,[data-testid="stTopNavLink"] span:not([data-testid="stIconMaterial"]){font-size:14px!important; font-weight:inherit;}
+[data-testid="stTopNavLink"]:hover,[data-testid="stTopNavSection"]:hover{background:var(--ic-neutral-bg)!important; color:var(--ic-ink)!important;}
+[data-testid="stTopNavSection"][aria-expanded="true"]{background:var(--ic-neutral-bg)!important; color:var(--ic-ink)!important;}
+[data-testid="stTopNavLink"][aria-current="page"],[data-testid="stPageLink-NavLink"][aria-current="page"]{background:var(--ic-primary-soft)!important; color:var(--ic-primary)!important; font-weight:650;}
+[data-testid="stTopNavLink"][aria-current="page"] *,[data-testid="stPageLink-NavLink"][aria-current="page"] *{color:var(--ic-primary)!important;}
+[data-testid="stPageLink-NavLink"]{border-radius:8px!important; padding:.45rem .7rem; font-size:14px; transition:background .12s;}
+[data-testid="stPageLink-NavLink"]:hover{background:var(--ic-neutral-bg)!important;}
+/* utilities (AI status and Menu) pinned into the right side of the header */
+[data-testid="stLayoutWrapper"]:has(> [class*="st-key-topbar"]){position:fixed!important; top:.52rem; right:1.4rem; z-index:1000002; width:auto!important; height:auto; margin:0;}
+[class*="st-key-topbar"]{width:auto!important; flex-wrap:nowrap!important; align-items:center; background:transparent!important; box-shadow:none!important; border:0!important; padding:0!important;}
+[class*="st-key-topbar"] [data-testid="stPopoverButton"]{min-height:2.3rem; padding:.2rem .8rem;}
+[class*="st-key-topbar"] .ic-chips{margin:0;} [class*="st-key-topbar"] .ic-chip{margin:0;}
 
 /* ---------- sidebar ---------- */
 [data-testid="stSidebar"]{border-right:1px solid var(--ic-line);}
@@ -133,7 +150,7 @@ h4{font-size:14px; font-weight:650; padding:.6rem 0 .2rem;}
 /* a bordered st.container is the stVerticalBlock itself: cards are identified by their key (see ui.card) */
 [class*="st-key-card"],[class*="st-key-rail"]{background:var(--ic-surface)!important; border-radius:var(--ic-r-lg)!important; border-color:var(--ic-line)!important; box-shadow:var(--ic-shadow-xs); padding:.7rem .8rem;}
 [class*="st-key-card"] [class*="st-key-card"]{box-shadow:none; background:var(--ic-surface2)!important;}
-[class*="st-key-rail"]{position:sticky; top:3.4rem; align-self:flex-start; max-height:calc(100vh - 4.4rem); overflow-y:auto; scrollbar-width:thin;}
+[class*="st-key-rail"]{position:sticky; top:4.6rem; align-self:flex-start; max-height:calc(100vh - 5.6rem); overflow-y:auto; scrollbar-width:thin;}
 [class*="st-key-hero"]{background:linear-gradient(135deg,#EEF6F2 0%%,#FFFFFF 65%%); border:1px solid #CFE3DB; border-radius:var(--ic-r-lg); padding:1.4rem 1.6rem 1.5rem; box-shadow:var(--ic-shadow-sm); height:100%%;}
 [class*="st-key-hero"] h4{padding-top:.1rem; font-size:20px; letter-spacing:-.02em;}
 
@@ -200,6 +217,8 @@ button[data-baseweb="tab"][aria-selected="true"]{color:var(--ic-primary); font-w
 [data-testid="stExpander"]{border:1px solid var(--ic-line)!important; border-radius:var(--ic-r-lg)!important; background:var(--ic-surface); box-shadow:var(--ic-shadow-xs);}
 [data-testid="stExpander"] summary{padding:.7rem 1rem; font-weight:600; color:var(--ic-ink); border-radius:var(--ic-r-lg);}
 [data-testid="stExpander"] summary:hover{background:var(--ic-surface2);}
+[data-testid="stPopoverBody"] [data-testid="stVerticalBlock"]{gap:.55rem;}
+[data-testid="stPopoverBody"] hr{margin:.4rem 0!important;}
 [data-testid="stPopoverBody"]{border-radius:var(--ic-r-lg); border:1px solid var(--ic-line); box-shadow:var(--ic-shadow-md); padding:1.1rem; background:var(--ic-surface);}
 
 /* ---------- alerts: softer, status-coloured, readable ---------- */
@@ -280,19 +299,19 @@ button[data-baseweb="tab"][aria-selected="true"]{color:var(--ic-primary); font-w
   /* rail + content layouts stack: the sidebar already takes a third of the screen */
   [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] [class*="st-key-rail"]) > [data-testid="stColumn"]{min-width:100%%!important; flex:1 1 100%%!important;}
 }
-@media (max-width:1100px){ [data-testid="stMainBlockContainer"]{padding:1.2rem 1.4rem 4rem;} [class*="st-key-rail"]{position:static;} }
+@media (max-width:1100px){ [data-testid="stMainBlockContainer"]{padding:4.5rem 1.4rem 4rem;} [class*="st-key-rail"]{position:static;} }
 @media (max-width:900px){
+  [class*="st-key-topbar"] [data-testid="stHtml"]{display:none;}
   [data-testid="stHorizontalBlock"]{flex-wrap:wrap!important; row-gap:.8rem;}
   [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]{min-width:calc(50%% - 1rem)!important; flex:1 1 calc(50%% - 1rem)!important;}
   .ic-title{font-size:25px;} [data-testid="stHeading"] h1,h1{font-size:25px;}
   .ic-step-label{display:none;} .ic-step.current .ic-step-label{display:inline;}
 }
 @media (max-width:640px){
-  [data-testid="stMainBlockContainer"]{padding:1rem .9rem 3.5rem;}
+  [data-testid="stMainBlockContainer"]{padding:4.3rem .9rem 3.5rem;}
   [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]{min-width:100%%!important; flex:1 1 100%%!important;}
   [data-testid="stMetricValue"]{font-size:22px;} .ic-profile{flex-direction:column; align-items:flex-start;}
 }
-@media (max-width:1000px){ [data-testid="stMainBlockContainer"]{padding-top:3.4rem;} }
 @media (max-width:640px){
   /* KPI cards stay two per row on phones */
   [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) > [data-testid="stColumn"]{min-width:calc(50%% - .6rem)!important; flex:1 1 calc(50%% - .6rem)!important;}
